@@ -71,11 +71,13 @@ async function open(path, { cart, order }) {
 
 const measure = (page) => page.evaluate(() => {
   const bar = document.querySelector("#cart-checkout-bar");
-  const panelBtn = [...document.querySelectorAll("button")].find((b) => /Accepted|Preparing|Ready|Delivered|Cancelled|Scheduled/.test(b.textContent) && b.className.includes("w-full"));
-  const dock = [...document.querySelectorAll("div")].find((d) => d.className.includes("fixed") && d.className.includes("flex-col") && d.style.length === 0 && d.children.length > 0 && getComputedStyle(d).position === "fixed");
+  // The order card is the bordered wrapper around the status button.
+  const statusBtn = [...document.querySelectorAll("button")].find((b) => /Accepted|Preparing|Ready|Delivered|Cancelled|Scheduled/.test(b.textContent) && b.className.includes("w-full"));
+  const panelCard = statusBtn?.closest("div.rounded-xl");
+  const dock = panelCard?.parentElement?.parentElement;
   const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right), h: Math.round(r.height) }; };
   return {
-    bar: box(bar), panel: box(panelBtn), dock: box(dock),
+    bar: box(bar), panel: box(panelCard), dock: box(dock),
     dockVar: getComputedStyle(document.documentElement).getPropertyValue("--bottom-dock-h").trim(),
     vh: window.innerHeight,
   };
@@ -134,11 +136,13 @@ const measure = (page) => page.evaluate(() => {
   await page.locator("text=Preparing").first().click();
   await page.waitForTimeout(700);
   const expanded = await page.evaluate(() => {
-    const el = [...document.querySelectorAll("div")].find((d) => d.textContent.includes("VIEW DETAILS") && getComputedStyle(d).position === "fixed");
+    // The sheet is portalled to <body>, so look there.
+    const el = [...document.body.children].find((d) => d.className?.includes?.("z-[9999]"));
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    return { w: Math.round(r.width), h: Math.round(r.height), hasTimeline: el.textContent.includes("Order Prepared") };
+    return { w: Math.round(r.width), h: Math.round(r.height), parent: el.parentElement?.tagName, hasTimeline: el.textContent.includes("Order Prepared"), hasViewDetails: el.textContent.includes("VIEW DETAILS") };
   });
+  rec("expand: sheet portalled to body", expanded && expanded.parent === "BODY", JSON.stringify(expanded));
   rec("expand: full-screen sheet with timeline", expanded && expanded.hasTimeline && expanded.h > 700, JSON.stringify(expanded));
   await page.screenshot({ path: "dock-expanded.png" });
   await ctx.close();

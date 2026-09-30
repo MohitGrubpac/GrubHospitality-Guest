@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useOrders } from "@/component/providers/OrdersProvider";
 
@@ -94,7 +95,11 @@ export default function OrderStatusPanel() {
   }));
 
   if (isExpanded) {
-    return (
+    // The dock is itself `position: fixed`, so a fixed child would resolve against
+    // the dock's box instead of the viewport. Portal to <body> to escape it.
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
       <>
         <div
           className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-[1.5px]"
@@ -145,7 +150,8 @@ export default function OrderStatusPanel() {
             </button>
           </div>
         </div>
-      </>
+      </>,
+      document.body,
     );
   }
 
