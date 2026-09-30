@@ -1,35 +1,57 @@
 "use client";
 
-import { createContext, useContext, useState, useMemo } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { showError } from "@/component/ui/Toast";
+import { useAuth } from "@/component/providers/AuthProvider";
 
 const RoomContext = createContext(null);
 
-const ROOM_MAP = {
-  "9876543210": ["206", "207", "208", "302"],
-  "1234567890": ["302"],
-};
-
+/**
+ * The guest profile carries a single `roomNumber`. Room switching therefore just
+ * persists the choice through PATCH /guests/me, which is what the kitchen reads
+ * when building the order.
+ */
 export function RoomProvider({ children }) {
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [phone, setPhone] = useState(null);
+  const { guest, updateProfile } = useAuth();
+  const [overrideRoom, setOverrideRoom] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const bookedRooms = useMemo(() => {
-    if (!phone) return [];
-    return ROOM_MAP[phone] || [];
-  }, [phone]);
+  const profileRoom = guest?.roomNumber || "";
+  const room = profileRoom ? overrideRoom || profileRoom : "";
 
+  const bookedRooms = useMemo(() => (profileRoom ? [profileRoom] : []), [profileRoom]);
   const isMultipleRooms = bookedRooms.length > 1;
+
+  const setSelectedRoom = useCallback(
+    async (nextRoom) => {
+      if (!nextRoom || nextRoom === room) return;
+
+      setOverrideRoom(nextRoom);
+
+      if (!profileRoom || nextRoom === profileRoom) return;
+
+      setIsSaving(true);
+      try {
+        await updateProfile({ roomNumber: nextRoom });
+      } catch (roomError) {
+        setOverrideRoom(null);
+        showError("Could not update your room. Please try again.");
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [room, profileRoom, updateProfile],
+  );
 
   const value = useMemo(
     () => ({
-      selectedRoom,
+      selectedRoom: room,
       setSelectedRoom,
       bookedRooms,
       isMultipleRooms,
-      phone,
-      setPhone,
+      isSavingRoom: isSaving,
     }),
-    [selectedRoom, bookedRooms, isMultipleRooms, phone],
+    [room, setSelectedRoom, bookedRooms, isMultipleRooms, isSaving],
   );
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;

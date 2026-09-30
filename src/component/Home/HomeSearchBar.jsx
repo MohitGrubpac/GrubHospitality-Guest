@@ -11,18 +11,9 @@ export default function HomeSearchBar({
 }) {
   const router = useRouter();
 
-  const handleChange = (e) => {
-    // Strip numeric digits 0-9
-    const cleanValue = e.target.value.replace(/[0-9]/g, "");
-    if (onChange) {
-      e.target.value = cleanValue;
-      onChange(e);
-    }
-  };
-
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && onNavigateOnEnter && value && value.trim().length > 0) {
-      router.push(`/home/search-result?q=${encodeURIComponent(value.trim())}`);
+      router.push(`/home/search?q=${encodeURIComponent(value.trim())}`);
     }
   };
 
@@ -32,7 +23,7 @@ export default function HomeSearchBar({
         type="text"
         placeholder={placeholder}
         value={value}
-        onChange={handleChange}
+        onChange={onChange}
         onKeyDown={handleKeyDown}
         className="w-full h-12 pl-12 pr-4 bg-white border border-[#e0e3e1] rounded-xl text-base text-[var(--color-neutral-primary,#03130a)] placeholder:text-[#a4aca7] outline-none focus:border-[#fe480b] transition-all shadow-xs"
       />

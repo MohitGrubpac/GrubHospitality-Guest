@@ -32,8 +32,9 @@ export default function LoadingScreen({ onComplete, duration = 2000 }) {
       <div className="relative w-[180px] h-[60px] mb-8">
         <Image
           src="/hyatt_logo.png"
-          alt="Hyatt Regency"
+          alt="Hotel"
           fill
+          sizes="180px"
           className="object-contain"
           priority
         />

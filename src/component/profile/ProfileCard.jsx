@@ -2,26 +2,16 @@
 
 import Image from "next/image";
 
-export default function ProfileCard({ user, avatarUrl, onEditClick }) {
-  const name = user?.name || user?.guestName || "Parveen Kumar";
-  const roomNumber = user?.room || user?.roomNumber || "302";
+export default function ProfileCard({ user, onEditClick }) {
+  const name = user?.name || user?.guestName || "Guest";
+  const roomNumber = user?.room || user?.roomNumber || "-";
+  const initials = user?.avatarInitials || "G";
 
   return (
     <div className="w-full bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-[#e0e3e1] flex items-center justify-between gap-4">
       <div className="flex flex-col items-center gap-3 shrink-0">
         <div className="w-[107px] h-[107px] rounded-full bg-[#FF4848] border border-white flex items-center justify-center text-white text-[28px] font-semibold leading-[36px] relative overflow-hidden shadow-xs">
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt={name}
-              fill
-              className="object-cover"
-            />
-          ) : (
-            <span className="text-white font-semibold text-[28px] leading-[36px]">
-              {user?.avatarInitials || "RK"}
-            </span>
-          )}
+          <span className="text-white font-semibold text-[28px] leading-[36px]">{initials}</span>
         </div>
 
         <button

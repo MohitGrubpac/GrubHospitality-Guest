@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import data from "@/data/data.json";
+import content from "@/data/static-content.json";
 
 export default function HelpPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
 
-  const { helpCategories = [], faqs = [] } = data;
+  const { helpCategories = [], faqs = [] } = content;
 
   const toggleFaq = (id) => {
     setOpenFaq(openFaq === id ? null : id);

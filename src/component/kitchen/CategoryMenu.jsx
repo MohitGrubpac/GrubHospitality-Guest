@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 export default function CategoryMenu({
@@ -37,7 +38,7 @@ export default function CategoryMenu({
           background: isOpen ? "var(--gp-color-bg-brand-secondary)" : "#FFFFFF",
         }}
       >
-        <img
+        <Image
           src="/kitchen/list.png"
           alt="Menu list"
           width={20}

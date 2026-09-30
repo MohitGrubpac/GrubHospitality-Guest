@@ -1,34 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import CategoryCard from "./CategoryCard";
 import CategoryMenu from "./CategoryMenu";
 import MenuItemCard from "./MenuItemCard";
 
 export default function MenuList({
-  restaurant = null,
   menuData = [],
   categories = [],
   activeCategory = "",
   onSelectCategory,
   onMenuItemClick,
-  onAddItem,
 }) {
-  const [expandedCategories, setExpandedCategories] = useState(() => {
-    const initial = {};
-    menuData.forEach((cat, index) => {
-      initial[cat.id] = index === 0;
+  // Expand the first category by default; user toggles are kept per category id.
+  const [toggled, setToggled] = useState({});
+
+  const expandedCategories = useMemo(() => {
+    const next = {};
+    menuData.forEach((category, index) => {
+      next[category.id] = toggled[category.id] ?? index === 0;
     });
-    return initial;
-  });
+    return next;
+  }, [menuData, toggled]);
 
   const toggleCategory = (categoryId) => {
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [categoryId]: !prev[categoryId],
+    setToggled((previous) => ({
+      ...previous,
+      [categoryId]: !(previous[categoryId] ?? false),
     }));
   };
+
+  if (menuData.length === 0) {
+    return (
+      <div className="w-full py-12 text-center text-[14px] text-[var(--gp-color-text-neutral-secondary)]">
+        No dishes match your filters.
+      </div>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col gap-[var(--gp-space-xl)]">
@@ -42,7 +51,7 @@ export default function MenuList({
             title={category.name}
             description={category.description}
             image={category.image}
-            isExpanded={expandedCategories[category.id]}
+            isExpanded={Boolean(expandedCategories[category.id])}
             onToggle={() => toggleCategory(category.id)}
             action={
               index === 0 ? (
@@ -68,18 +77,11 @@ export default function MenuList({
               </div>
 
               <div className="w-full flex flex-col">
-                {category.items?.map((item, itemIndex) => (
+                {(category.items || []).map((item, itemIndex) => (
                   <div key={item.id} className="w-full flex flex-col">
                     <MenuItemCard
-                      restaurant={restaurant}
                       item={item}
-                      name={item.name}
-                      description={item.description}
-                      rating={item.rating}
-                      price={item.price}
-                      isVeg={item.isVeg}
-                      image={item.image}
-                      onAdd={() => onAddItem?.(item)}
+                      isOutOfStock={item.isOutOfStock}
                       onClick={() => onMenuItemClick?.(item)}
                     />
                     {itemIndex < category.items.length - 1 && (

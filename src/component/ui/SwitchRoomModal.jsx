@@ -12,10 +12,8 @@ export default function SwitchRoomModal({
   const { bookedRooms } = useRoom();
   const [selectedRoom, setSelectedRoom] = useState(currentRoom);
 
-  // Build room list from context, with current room first
-  const rooms = bookedRooms.length > 1
-    ? [currentRoom, ...bookedRooms.filter((r) => r !== currentRoom)]
-    : [currentRoom, ...["206", "207", "208"].filter((r) => r !== currentRoom)];
+  // Only rooms the guest actually holds - never a fabricated list.
+  const rooms = bookedRooms.length > 0 ? bookedRooms : currentRoom ? [currentRoom] : [];
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -88,38 +86,39 @@ export default function SwitchRoomModal({
 
         {/* Room list */}
         <div className="px-5 pb-4 flex flex-col gap-4">
-          {rooms.map((room) => {
-            const isSelected = selectedRoom === room;
-            const isCurrent = currentRoom === room;
-            return (
-              <label
-                key={room}
-                className="flex items-center gap-3 cursor-pointer"
-              >
-                <div className="relative w-5 h-5 shrink-0">
-                  <input
-                    type="radio"
-                    name="switch-room"
-                    checked={isSelected}
-                    onChange={() => setSelectedRoom(room)}
-                    className="peer sr-only"
-                  />
-                  <div className="w-5 h-5 rounded-full border-2 border-[#e0e3e1] peer-checked:border-[#fe480b] transition-colors" />
-                  {isSelected && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#fe480b]" />
-                    </div>
-                  )}
-                </div>
-                <span className="text-sm text-[#03130a]">
-                  Room {room}
-                  {isCurrent && (
-                    <span className="text-[#6b7971]"> (Current)</span>
-                  )}
-                </span>
-              </label>
-            );
-          })}
+          {rooms.length === 0 ? (
+            <p className="text-sm text-[#6b7971]">
+              No room is linked to your reservation yet.
+            </p>
+          ) : (
+            rooms.map((room) => {
+              const isSelected = selectedRoom === room;
+              const isCurrent = currentRoom === room;
+              return (
+                <label key={room} className="flex items-center gap-3 cursor-pointer">
+                  <div className="relative w-5 h-5 shrink-0">
+                    <input
+                      type="radio"
+                      name="switch-room"
+                      checked={isSelected}
+                      onChange={() => setSelectedRoom(room)}
+                      className="peer sr-only"
+                    />
+                    <div className="w-5 h-5 rounded-full border-2 border-[#e0e3e1] peer-checked:border-[#fe480b] transition-colors" />
+                    {isSelected && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-2.5 h-2.5 rounded-full bg-[#fe480b]" />
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-sm text-[#03130a]">
+                    Room {room}
+                    {isCurrent && <span className="text-[#6b7971]"> (Current)</span>}
+                  </span>
+                </label>
+              );
+            })
+          )}
         </div>
 
         {/* Confirm button */}
@@ -127,7 +126,8 @@ export default function SwitchRoomModal({
           <button
             type="button"
             onClick={handleConfirm}
-            className="w-full py-3.5 bg-[#fe480b] text-white rounded-xl text-xs font-bold uppercase tracking-wide cursor-pointer hover:bg-[#e4450a] transition-colors"
+            disabled={!selectedRoom}
+            className="w-full py-3.5 bg-[#fe480b] text-white rounded-xl text-xs font-bold uppercase tracking-wide cursor-pointer hover:bg-[#e4450a] transition-colors disabled:opacity-50"
           >
             Confirm Room
           </button>

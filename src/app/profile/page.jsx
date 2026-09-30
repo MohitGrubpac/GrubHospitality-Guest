@@ -4,39 +4,45 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import data from "@/data/data.json";
 
 import ProfileCard from "@/component/profile/ProfileCard";
 import StayDetailsCard from "@/component/profile/StayDetailsCard";
 import OrderStatusCard from "@/component/profile/OrderStatusCard";
 import OrderHistoryCard from "@/component/profile/OrderHistoryCard";
 import ProfileEditView from "@/component/profile/ProfileEditView";
+import { useAuth } from "@/component/providers/AuthProvider";
 import { useRoom } from "@/component/providers/RoomProvider";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [isEditing, setIsEditing] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState(null);
+  const { guest, updateProfile, logout, isLoading } = useAuth();
   const { selectedRoom } = useRoom();
 
-  const { user } = data;
+  const [isEditing, setIsEditing] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const userWithRoom = {
-    ...user,
-    room: selectedRoom || user.room,
-  };
+  if (isLoading || !guest) {
+    return (
+      <div className="w-full min-h-screen bg-[#f8faf9] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#fe480b] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const userWithRoom = { ...guest, room: selectedRoom || guest.room };
 
   const handleBack = () => {
     if (isEditing) {
       setIsEditing(false);
-    } else {
-      router.push("/home");
+      return;
     }
+    router.push("/home");
   };
 
-  const handleSaveAvatar = (newAvatarUrl) => {
-    setAvatarUrl(newAvatarUrl);
-    setIsEditing(false);
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    await logout();
+    router.replace("/login");
   };
 
   return (
@@ -64,35 +70,28 @@ export default function ProfilePage() {
         <main className="flex-1 px-5 pt-4 pb-12 flex flex-col gap-4 overflow-y-auto">
           {isEditing ? (
             <ProfileEditView
+              key={`${guest.name}-${guest.roomNumber}`}
               user={userWithRoom}
-              avatarUrl={avatarUrl}
-              onSaveAvatar={handleSaveAvatar}
+              onSave={updateProfile}
               onCancel={() => setIsEditing(false)}
             />
           ) : (
             <>
-              {/* Profile Card */}
-              <ProfileCard
-                user={userWithRoom}
-                avatarUrl={avatarUrl}
-                onEditClick={() => setIsEditing(true)}
-              />
+              <ProfileCard user={userWithRoom} onEditClick={() => setIsEditing(true)} />
 
-              {/* Stay Details Card */}
-              <StayDetailsCard user={user} />
+              <StayDetailsCard user={guest} />
 
-              {/* Order Status Card */}
               <OrderStatusCard />
 
-              {/* Order History Card */}
               <OrderHistoryCard />
 
               {/* Logout Button */}
               <div className="w-full pt-1">
                 <button
                   type="button"
-                  onClick={() => router.push("/login")}
-                  className="w-full py-3 bg-white border border-[#03130a]/40 text-[#445048] rounded-xl text-sm font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="w-full py-3 bg-white border border-[#03130a]/40 text-[#445048] rounded-xl text-sm font-bold uppercase flex items-center justify-center gap-2 cursor-pointer shadow-2xs disabled:opacity-60"
                 >
                   <Image
                     src="/profile/logout.svg"
@@ -101,17 +100,14 @@ export default function ProfilePage() {
                     height={18}
                     className="w-4.5 h-4.5 object-contain"
                   />
-                  <span>logout</span>
+                  <span>{isLoggingOut ? "logging out..." : "logout"}</span>
                 </button>
               </div>
 
-              {/* Footer  */}
+              {/* Footer */}
               <div className="flex flex-col items-center gap-4 py-4 mt-1 bg-transparent">
                 <div className="flex items-center justify-center gap-8 text-xs font-bold text-[#6b7971]">
-                  <Link
-                    href="/help"
-                    className="flex items-center gap-1.5 uppercase cursor-pointer"
-                  >
+                  <Link href="/help" className="flex items-center gap-1.5 uppercase cursor-pointer">
                     <Image
                       src="/profile/help.svg"
                       alt="Help"
@@ -121,10 +117,7 @@ export default function ProfilePage() {
                     />
                     <span>help</span>
                   </Link>
-                  <Link
-                    href="/help"
-                    className="uppercase cursor-pointer"
-                  >
+                  <Link href="/help" className="uppercase cursor-pointer">
                     faq
                   </Link>
                 </div>

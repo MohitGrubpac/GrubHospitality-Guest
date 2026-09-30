@@ -3,12 +3,12 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import CartCounterButton from "@/component/ui/CartCounterButton";
+import { KITCHEN_FALLBACK_IMAGE } from "@/lib/adapters/catalogAdapter";
 
 export default function RestaurantDishGroupCard({
   restaurant,
   dishes = [],
   onSelectDish,
-  onAddToCart,
 }) {
   const router = useRouter();
   if (!restaurant) return null;
@@ -23,9 +23,7 @@ export default function RestaurantDishGroupCard({
           <h3 className="text-base font-bold text-[#03130a] group-hover:text-[#fe480b] transition-colors">
             {restaurant.name}
           </h3>
-          <p className="text-xs text-[#6b7971] line-clamp-2">
-            {restaurant.description}
-          </p>
+          <p className="text-xs text-[#6b7971] line-clamp-2">{restaurant.description}</p>
         </div>
         <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0 group-hover:bg-red-50 group-hover:text-[#fe480b] transition-colors">
           <Image
@@ -42,51 +40,34 @@ export default function RestaurantDishGroupCard({
         {dishes.map((dish) => (
           <div
             key={dish.id}
-            onClick={() => onSelectDish && onSelectDish(dish)}
+            onClick={() => onSelectDish?.(dish)}
             className="w-[240px] border border-[#e0e3e1] rounded-xl p-3 flex flex-col gap-2 shrink-0 bg-white shadow-2xs hover:border-[#fe480b]/40 transition-all cursor-pointer"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-col gap-1 min-w-0 flex-1">
                 <Image
                   src={dish.isVeg ? "/restaurant/veg_badge.svg" : "/restaurant/nonveg_badge.svg"}
-                  alt="Veg"
+                  alt={dish.isVeg ? "Veg" : "Non-Veg"}
                   width={14}
                   height={14}
                   className="w-3.5 h-3.5 object-contain"
                 />
-                <h4 className="text-xs font-bold text-[#03130a] line-clamp-2">
-                  {dish.name}
-                </h4>
-                <div className="flex items-center gap-1 text-[11px] font-semibold text-[#03130a]">
-                  <Image
-                    src="/restaurant/star.svg"
-                    alt="Star"
-                    width={12}
-                    height={12}
-                    className="w-3 h-3 object-contain"
-                  />
-                  <span>{dish.rating || 4.6}</span>
-                </div>
-                <div className="text-xs font-bold text-[#03130a] mt-1">
-                  ₹ {dish.price}
-                </div>
+                <h4 className="text-xs font-bold text-[#03130a] line-clamp-2">{dish.name}</h4>
+                <div className="text-xs font-bold text-[#03130a] mt-1">₹ {dish.price}</div>
               </div>
 
-              <div className="w-16 h-16 relative rounded-lg overflow-hidden shrink-0 border border-slate-100">
+              <div className="w-16 h-16 relative rounded-lg overflow-hidden shrink-0 border border-slate-100 bg-[#f4f5f4]">
                 <Image
-                  src={dish.image || "/food-items/restaurant.jpg"}
+                  src={dish.image || KITCHEN_FALLBACK_IMAGE}
                   alt={dish.name}
                   fill
+                  sizes="64px"
                   className="object-cover object-center"
                 />
               </div>
             </div>
 
-            {/* Cart Counter Button */}
-            <CartCounterButton
-              restaurant={{ id: restaurant.id, name: restaurant.name, slug: restaurant.slug }}
-              item={dish}
-            />
+            <CartCounterButton menuItemId={dish.menuItemId} disabled={dish.isOutOfStock} />
           </div>
         ))}
       </div>
