@@ -93,6 +93,20 @@ function createSignal(signal, timeout) {
 
 let refreshInFlight = null;
 
+/** Accepts top-level or wrapped ({data|session|tokens}) refresh payloads. */
+function extractRefreshTokens(payload) {
+  if (!payload || typeof payload !== "object") return {};
+
+  const candidates = [payload, payload.data, payload.session, payload.tokens];
+  for (const source of candidates) {
+    if (!source || typeof source !== "object") continue;
+    const accessToken = typeof source.accessToken === "string" ? source.accessToken : null;
+    const refreshToken = typeof source.refreshToken === "string" ? source.refreshToken : null;
+    if (accessToken || refreshToken) return { accessToken, refreshToken };
+  }
+  return {};
+}
+
 async function performRefresh() {
   if (refreshInFlight) return refreshInFlight;
 
@@ -105,20 +119,30 @@ async function performRefresh() {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ refreshToken }),
+        cache: "no-store",
       });
 
       if (!response.ok) {
-        clearTokens();
+        // 4xx = the refresh token itself was rejected -> the session is dead.
+        // Network errors / 5xx keep the tokens so a later retry can recover.
+        if (response.status === 400 || response.status === 401 || response.status === 403) {
+          clearTokens();
+        }
         return false;
       }
 
-      const session = await response.json();
+      const payload = await response.json().catch(() => null);
+      const { accessToken, refreshToken: rotated } = extractRefreshTokens(payload);
+
+      // 200 with an unusable shape: keep what we have instead of wiping it.
+      if (!accessToken) return false;
+
       setTokens({
-        accessToken: session?.accessToken ?? null,
-        refreshToken: session?.refreshToken ?? null,
+        accessToken,
+        ...(rotated ? { refreshToken: rotated } : {}),
       });
 
-      return Boolean(session?.accessToken);
+      return true;
     } catch {
       return false;
     } finally {

@@ -2,10 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ORGANIZATION_ID } from "@/config/env";
-import { ApiError } from "@/lib/api-client";
+import { ApiError, refreshSession } from "@/lib/api-client";
 import {
   clearTokens,
   getAccessToken,
+  getRefreshToken,
+  hasSession,
+  isAccessTokenExpired,
   setTokens,
   subscribeToSession,
 } from "@/lib/token-store";
@@ -22,12 +25,13 @@ export const AUTH_STATUS = {
 };
 
 export function AuthProvider({ children }) {
-  // Presence of a stored access token is read as an external store so the very
-  // first client render already knows whether a session is being validated,
-  // instead of bouncing through a setState-in-effect reset.
-  const hasStoredToken = useSyncExternalStore(
+  // Presence of a stored session (access OR refresh token) is read as an external
+  // store so the very first client render already knows whether a session is being
+  // validated, instead of bouncing through a setState-in-effect reset. Refresh-only
+  // sessions must enter LOADING so the refresh token can restore them.
+  const hasStoredSession = useSyncExternalStore(
     subscribeToSession,
-    () => Boolean(getAccessToken()),
+    () => hasSession(),
     () => true,
   );
 
@@ -37,7 +41,7 @@ export function AuthProvider({ children }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  const status = hasStoredToken ? sessionStatus : AUTH_STATUS.ANONYMOUS;
+  const status = hasStoredSession ? sessionStatus : AUTH_STATUS.ANONYMOUS;
 
   // Returns the *adapted* guest, so callers get the normalised shape
   // (e.g. `roomNumbers`) rather than the raw API payload.
@@ -60,33 +64,41 @@ export function AuthProvider({ children }) {
     setSessionStatus(AUTH_STATUS.ANONYMOUS);
   }, []);
 
-  // Startup: adopt any stored session, then confirm it with GET /guests/me.
-  // api-client silently refreshes the access token on 401 before surfacing the error.
+  // Startup: restore the stored session, then confirm it with GET /guests/me.
+  // - Refresh-only or expired-JWT sessions are proactively refreshed first, so the
+  //   refresh token is actually used instead of dead-ending on a 401.
+  // - Tokens are only dropped when no refresh token remains (a definitive auth
+  //   failure clears them inside api-client); transient refresh failures keep the
+  //   session so a reload can recover.
   useEffect(() => {
-    if (!hasStoredToken) return undefined;
+    if (!hasStoredSession) return undefined;
 
     let cancelled = false;
 
-    guestService
-      .getGuestProfile()
-      .then((profile) => {
+    (async () => {
+      try {
+        if (getRefreshToken() && (!getAccessToken() || isAccessTokenExpired())) {
+          await refreshSession();
+        }
+
+        const profile = await guestService.getGuestProfile();
         if (cancelled) return;
         setGuest(toGuestUser(profile));
         setSessionStatus(AUTH_STATUS.AUTHENTICATED);
-      })
-      .catch((bootstrapError) => {
+      } catch (bootstrapError) {
         if (cancelled) return;
-        if (bootstrapError instanceof ApiError && bootstrapError.isUnauthorized) {
+        if (bootstrapError instanceof ApiError && bootstrapError.isUnauthorized && !getRefreshToken()) {
           clearTokens();
         }
         setGuest(null);
         setSessionStatus(AUTH_STATUS.ANONYMOUS);
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [hasStoredToken]);
+  }, [hasStoredSession]);
 
   const setOrganization = useCallback((nextOrganizationId) => {
     setOrganizationId(nextOrganizationId || "");
@@ -185,7 +197,7 @@ export function AuthProvider({ children }) {
       setSessionStatus(AUTH_STATUS.AUTHENTICATED);
       return next;
     } catch (refetchError) {
-      if (refetchError instanceof ApiError && refetchError.isUnauthorized) {
+      if (refetchError instanceof ApiError && refetchError.isUnauthorized && !getRefreshToken()) {
         clearTokens();
         setGuest(null);
         setSessionStatus(AUTH_STATUS.ANONYMOUS);

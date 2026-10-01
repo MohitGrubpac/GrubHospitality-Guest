@@ -82,3 +82,30 @@ export function hasSession() {
   hydrate();
   return Boolean(cache.accessToken || cache.refreshToken);
 }
+
+function decodeJwtExp(token) {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const { exp } = JSON.parse(atob(padded));
+    return typeof exp === "number" ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the stored access token is an expired JWT (within `skewSeconds` of
+ * expiry). Opaque / non-JWT tokens report false - those are handled reactively
+ * by the 401 -> refresh -> retry path in api-client.
+ */
+export function isAccessTokenExpired(skewSeconds = 30) {
+  const token = getAccessToken();
+  if (!token) return true;
+  if (typeof atob !== "function") return false;
+  const exp = decodeJwtExp(token);
+  if (exp === null) return false;
+  return exp * 1000 <= Date.now() + skewSeconds * 1000;
+}
