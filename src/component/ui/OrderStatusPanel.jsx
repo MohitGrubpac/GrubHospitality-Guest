@@ -113,10 +113,13 @@ function TimelineStep({ icon, title, subtitle, subtitleClassName = "text-[#9ca8a
  */
 export default function OrderStatusPanel() {
   const router = useRouter();
-  const { activeOrder } = useOrders();
+  const { activeOrder, orders } = useOrders();
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!activeOrder) return null;
+
+  const activeOrders = orders.filter((order) => order && !order.isTerminal);
+  const hasManyActive = activeOrders.length > 1;
 
   const primaryMessage = STATUS_MESSAGES[activeOrder.status] || "Your order is in progress.";
 
@@ -210,10 +213,27 @@ export default function OrderStatusPanel() {
                 setIsExpanded(false);
                 router.push("/order-status");
               }}
-              className="w-full py-4 text-xs font-bold uppercase tracking-widest text-[#03130a] cursor-pointer hover:bg-[#f7f8fa] transition-colors rounded-b-2xl"
+              className={`w-full py-4 text-xs font-bold uppercase tracking-widest text-[#03130a] cursor-pointer hover:bg-[#f7f8fa] transition-colors ${
+                hasManyActive ? "" : "rounded-b-2xl"
+              }`}
             >
               VIEW DETAILS
             </button>
+            {hasManyActive && (
+              <>
+                <div className="h-px bg-[#eff1f0]" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExpanded(false);
+                    router.push("/active-orders");
+                  }}
+                  className="w-full py-4 text-xs font-bold uppercase tracking-widest text-[#03130a] cursor-pointer hover:bg-[#f7f8fa] transition-colors rounded-b-2xl"
+                >
+                  ALL ACTIVE ORDERS
+                </button>
+              </>
+            )}
           </div>
         </div>
       </>,

@@ -99,6 +99,8 @@ const copy = await page.locator("body").innerText();
 rec("header shows highlighted received copy", copy.includes("We've successfully received your order."));
 rec("step subtitles match figma", copy.includes("Done") && copy.includes("In Process...") && copy.includes("Est. 15 Minutes"));
 rec("VIEW DETAILS footer present", copy.includes("VIEW DETAILS"));
+const extraBtn = await page.locator('button:has-text("ALL ACTIVE ORDERS")').count();
+rec("single active order shows no ALL ACTIVE ORDERS button", extraBtn === 0, `count=${extraBtn}`);
 
 await page.screenshot({ path: "order-status-sheet.png" });
 await ctx.close();

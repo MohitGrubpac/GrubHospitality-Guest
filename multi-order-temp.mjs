@@ -118,7 +118,7 @@ if (page.url().includes("/room-selection")) {
 await page.waitForURL("**/home", { timeout: 20000 });
 await page.waitForSelector("text=Our Restaurants", { timeout: 20000 });
 
-// ---- Phase 1: sibling order rows are clickable ----
+// ---- Phase 1: confirmation page shows the in-flight order, no inline list ----
 await page.goto(`${BASE}/order-status`, { waitUntil: "domcontentloaded" });
 try {
   await page.waitForSelector("text=Order Confirmed!", { timeout: 20000 });
@@ -128,25 +128,10 @@ try {
   throw error;
 }
 
-const rows = page.locator('button[aria-pressed]:has-text("GH-100")');
-const rowCount = await rows.count();
-rec("multi-order checkout lists both order rows", rowCount === 2, `rows=${rowCount}`);
-
-const rowLive = page.locator('button[aria-pressed]:has-text("GH-1001")');
-const rowDone = page.locator('button[aria-pressed]:has-text("GH-1002")');
-
-await rowDone.click();
-await page.waitForSelector("text=Order GH-1002", { timeout: 10000 });
-const donePressed = await rowDone.getAttribute("aria-pressed");
-const showsDoneCode = await page.locator("text=Order GH-1002").count();
-rec("clicking sibling order row switches to that order's details",
-  donePressed === "true" && showsDoneCode >= 1,
-  `pressed=${donePressed} codeHits=${showsDoneCode}`);
-
-await rowLive.click();
-await page.waitForSelector("text=Order GH-1001", { timeout: 10000 });
-const livePressed = await rowLive.getAttribute("aria-pressed");
-rec("clicking back restores the in-flight order", livePressed === "true", `pressed=${livePressed}`);
+const rows = await page.locator('button[aria-pressed]:has-text("GH-100")').count();
+rec("confirmation page has no inline order list", rows === 0, `rows=${rows}`);
+const defaultCode = await page.locator("text=Order GH-1001").count();
+rec("shows the in-flight order by default", defaultCode >= 1, `hits=${defaultCode}`);
 
 // ---- Phase 2: dock panel visible with an in-flight order ----
 await page.goto(`${BASE}/home`, { waitUntil: "domcontentloaded" });

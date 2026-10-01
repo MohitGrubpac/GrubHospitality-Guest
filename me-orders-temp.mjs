@@ -109,32 +109,44 @@ rec("each active order fetched via GET /guest/orders/{id}", allActiveFetched,
 rec("delivered/cancelled orders are never fetched", terminalFetched.length === 0,
   terminalFetched.map((o) => o.orderCode).join(","));
 
-// ---- Status screen: active orders list, click -> details ----
+// ---- Status screen is confirmation-only: no inline order list ----
 await page.goto(`${BASE}/order-status`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector("text=Order Confirmed!", { timeout: 20000 });
-await page.waitForSelector("text=Active Orders", { timeout: 10000 });
-
-const rows = page.locator('button[aria-pressed]:has-text("GUEST-DEMO")');
-const rowCount = await rows.count();
-rec("list shows exactly the active orders", rowCount === ACTIVE.length, `rows=${rowCount} active=${ACTIVE.length}`);
 
 const defaultShown = await page.locator("text=Order GUEST-DEMO-1").count();
 rec("newest active order shown by default", defaultShown >= 1, `hits=${defaultShown}`);
 
-const row2 = page.locator('button[aria-pressed]:has-text("GUEST-DEMO-2")');
-await row2.click();
+const rows = await page.locator('button[aria-pressed]:has-text("GUEST-DEMO")').count();
+rec("confirmation page has no inline order list", rows === 0, `rows=${rows}`);
+
+// ---- Panel gains an ALL ACTIVE ORDERS button when several orders are active ----
+await page.goto(`${BASE}/home`, { waitUntil: "domcontentloaded" });
+const dockBtn = page.locator('button[aria-expanded][class*="justify-between"]');
+await dockBtn.waitFor({ timeout: 20000 });
+await dockBtn.click();
+await page.waitForSelector("text=VIEW DETAILS", { timeout: 5000 });
+const viewDetailsCount = await page.locator('button:has-text("VIEW DETAILS")').count();
+const allActiveCount = await page.locator('button:has-text("ALL ACTIVE ORDERS")').count();
+rec("expanded panel shows VIEW DETAILS + ALL ACTIVE ORDERS",
+  viewDetailsCount === 1 && allActiveCount === 1,
+  `vd=${viewDetailsCount} aa=${allActiveCount}`);
+
+await page.locator('button:has-text("ALL ACTIVE ORDERS")').click();
+await page.waitForURL("**/active-orders", { timeout: 10000 });
+await page.waitForSelector("text=View your orders in progress", { timeout: 10000 });
+
+const cardButtons = page.locator('button:has-text("VIEW DETAILS")');
+const cardCount = await cardButtons.count();
+rec("all active orders page lists every active order", cardCount === ACTIVE.length, `cards=${cardCount}`);
+
+const pageCopy = await page.locator("body").innerText();
+rec("cards show server-driven statuses",
+  pageCopy.includes("Accepted") && pageCopy.includes("Preparing") && pageCopy.includes("Ready"));
+
+await cardButtons.nth(1).click();
+await page.waitForURL("**/order-status", { timeout: 10000 });
 await page.waitForSelector("text=Order GUEST-DEMO-2", { timeout: 10000 });
-const pressed2 = await row2.getAttribute("aria-pressed");
-rec("clicking an active order shows its details", pressed2 === "true", `pressed=${pressed2}`);
-
-const row3 = page.locator('button[aria-pressed]:has-text("GUEST-DEMO-3")');
-await row3.click();
-await page.waitForSelector("text=Order GUEST-DEMO-3", { timeout: 10000 });
-const readyRow = await page.locator('button[aria-pressed]:has-text("GUEST-DEMO-3")').innerText();
-rec("third active order switchable too", readyRow.includes("Ready"), readyRow.trim());
-
-const terminalRows = await page.locator('button[aria-pressed]:has-text("GUEST-DEMO-4"), button[aria-pressed]:has-text("GUEST-DEMO-5")').count();
-rec("terminal orders are not listed", terminalRows === 0, `terminalRows=${terminalRows}`);
+rec("card VIEW DETAILS opens that order's confirmation page", true);
 
 rec("frontend never writes to the orders API", orderWrites === 0, `writes=${orderWrites}`);
 

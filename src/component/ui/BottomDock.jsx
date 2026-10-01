@@ -9,7 +9,7 @@ import { useOrders } from "@/component/providers/OrdersProvider";
 
 /** Routes that own the bottom of the screen and must not get the dock. */
 const CART_HIDDEN_ROUTES = ["/", "/login", "/signup", "/room-selection", "/cart"];
-const ORDER_HIDDEN_ROUTES = ["/", "/login", "/signup", "/room-selection", "/cart", "/order-status"];
+const ORDER_HIDDEN_ROUTES = ["/", "/login", "/signup", "/room-selection", "/cart", "/order-status", "/active-orders"];
 
 /**
  * One fixed stack for every bottom action, so the cart bar and the order tracker can

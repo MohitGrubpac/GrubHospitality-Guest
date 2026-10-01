@@ -83,7 +83,7 @@ export default function OrderStatusPage() {
   const router = useRouter();
   const { guest } = useAuth();
   const { selectedRoom } = useRoom();
-  const { activeOrder, orders, isLoading, hasActiveOrder, setActiveOrderId } = useOrders();
+  const { activeOrder, isLoading, hasActiveOrder } = useOrders();
 
   if (isLoading && !activeOrder) {
     return (
@@ -99,10 +99,6 @@ export default function OrderStatusPage() {
   const isDelivered = activeOrder.isDelivered;
   const isScheduled = activeOrder.status === "SCHEDULED";
   const steps = activeOrder.steps || [];
-  // Active orders the guest can switch between (plus the terminal one on screen).
-  const listOrders = orders.filter(
-    (order) => !order.isTerminal || order.id === activeOrder.id,
-  );
 
   const handleBack = () => {
     if (activeOrder.kitchenSlug) {
@@ -180,33 +176,6 @@ export default function OrderStatusPage() {
             <h1 className="text-lg font-bold text-[#03130a]">{headline}</h1>
             <p className="text-xs text-[#6b7971] leading-relaxed max-w-[280px] mt-1">{subline}</p>
           </div>
-
-          {/* Active orders - the guest picks one to inspect */}
-          {listOrders.length > 1 && (
-            <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#f0f2f1]">
-              <h3 className="text-sm font-bold text-[#03130a] mb-3">Active Orders</h3>
-              <div className="flex flex-col gap-2">
-                {listOrders.map((order) => (
-                  <button
-                    key={order.id}
-                    type="button"
-                    onClick={() => setActiveOrderId(order.id)}
-                    aria-pressed={order.id === activeOrder.id}
-                    className={`w-full flex items-center justify-between text-xs px-3 py-2 rounded-lg border cursor-pointer text-left transition-colors ${
-                      order.id === activeOrder.id
-                        ? "border-[#fe480b] bg-[#fef2f0]"
-                        : "border-[#f0f2f1] hover:bg-[#f7f8fa]"
-                    }`}
-                  >
-                    <span className="font-semibold text-[#03130a]">
-                      {order.orderCode || order.restaurantName}
-                    </span>
-                    <span className="text-[#6b7971]">{order.statusLabel}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Delivery Details */}
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#f0f2f1]">
