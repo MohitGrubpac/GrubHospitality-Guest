@@ -3,14 +3,9 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import CategoryCard from "./CategoryCard";
-import CategoryMenu from "./CategoryMenu";
 import MenuItemCard from "./MenuItemCard";
-
 export default function MenuList({
   menuData = [],
-  categories = [],
-  activeCategory = "",
-  onSelectCategory,
   onMenuItemClick,
 }) {
   // Expand the first category by default; user toggles are kept per category id.
@@ -41,7 +36,7 @@ export default function MenuList({
 
   return (
     <div className="w-full flex flex-col gap-[var(--gp-space-xl)]">
-      {menuData.map((category, index) => (
+      {menuData.map((category) => (
         <div
           key={category.id}
           id={`category-${category.id}`}
@@ -53,15 +48,6 @@ export default function MenuList({
             image={category.image}
             isExpanded={Boolean(expandedCategories[category.id])}
             onToggle={() => toggleCategory(category.id)}
-            action={
-              index === 0 ? (
-                <CategoryMenu
-                  categories={categories}
-                  activeCategory={activeCategory}
-                  onSelectCategory={onSelectCategory}
-                />
-              ) : null
-            }
           />
 
           {expandedCategories[category.id] && (

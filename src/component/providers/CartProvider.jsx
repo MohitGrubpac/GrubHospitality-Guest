@@ -168,7 +168,7 @@ export function CartProvider({ children }) {
   const clear = useCallback(() => runMutation("__all__", () => cartService.clearCart()), [runMutation]);
 
   const checkout = useCallback(
-    async ({ specialInstructions } = {}) => {
+    async ({ specialInstructions, roomNumber } = {}) => {
       const requestId = ++requestRef.current;
       setMutatingId("__checkout__");
       setError(null);
@@ -176,6 +176,7 @@ export function CartProvider({ children }) {
       try {
         const orders = await cartService.checkoutGuestCart({
           specialInstructions: specialInstructions?.trim() || undefined,
+          roomNumber,
         });
 
         if (requestId === requestRef.current) {

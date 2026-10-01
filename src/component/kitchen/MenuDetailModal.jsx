@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { MdClose, MdOutlineDeliveryDining, MdOutlineSchedule } from "react-icons/md";
+import { MdClose } from "react-icons/md";
 import CartCounterButton from "@/component/ui/CartCounterButton";
 import TagChips from "@/component/ui/TagChips";
 import VegIndicator from "@/component/ui/VegIndicator";
@@ -64,13 +64,9 @@ export default function MenuDetailModal({ item, onClose }) {
             )}
 
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-[12px]">
-                <span className="text-[18px] font-semibold text-[var(--gp-color-text-neutral-primary)]">
-                  ₹{price}
-                </span>
-                <MdOutlineDeliveryDining className="w-[16px] h-[16px] text-[var(--gp-color-text-neutral-tertiary)]" />
-                <MdOutlineSchedule className="w-[16px] h-[16px] text-[var(--gp-color-text-neutral-tertiary)]" />
-              </div>
+              <span className="text-[18px] font-semibold text-[var(--gp-color-text-neutral-primary)]">
+                ₹{price}
+              </span>
               <CartCounterButton
                 menuItemId={menuItemId}
                 disabled={isOutOfStock}

@@ -1,4 +1,4 @@
-﻿import { chromium } from "playwright-core";
+import { chromium } from "playwright-core";
 
 const CHROME = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe";
 const BASE = process.env.APP_URL || "http://localhost:3222";
@@ -36,9 +36,9 @@ await page.route(`${API}/**`, (route) => {
   const auth = route.request().headers().authorization;
   const ok = (b) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(b) });
   if (p === "/guest-auth/otp/request") return ok({ message: "sent" });
-  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: GUEST });
+  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: { ...GUEST, orders: [] } });
   if (!auth) return route.fulfill({ status: 401, contentType: "application/json", body: "{}" });
-  if (p === "/guests/me") return ok(GUEST);
+  if (p === "/guests/me") return ok({ ...GUEST, orders: [] });
   if (p === "/guest/kitchens") return ok(KITCHENS);
   if (p === "/guest/cart") return ok({ kitchens: [], grandTotalMinor: 0, itemCount: 0 });
   return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });

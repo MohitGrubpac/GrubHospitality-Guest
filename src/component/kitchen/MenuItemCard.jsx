@@ -1,22 +1,33 @@
 "use client";
 
 import Image from "next/image";
-import { MdOutlineDeliveryDining, MdOutlineSchedule } from "react-icons/md";
 import CartCounterButton from "@/component/ui/CartCounterButton";
+import TagChips from "@/component/ui/TagChips";
 import VegIndicator from "@/component/ui/VegIndicator";
 
-function ItemMeta({ rating }) {
+function ItemMeta({ rating, tagList = [] }) {
+  const hasRating = Number(rating) > 0;
+  const hasTags = Array.isArray(tagList) && tagList.length > 0;
+
+  if (!hasRating && !hasTags) return null;
+
   return (
-    <div className="flex items-center gap-[var(--gp-space-s)] mt-[4px]">
-      {rating > 0 && (
-        <div className="flex items-center gap-[4px]">
-          <span className="text-[14px] font-medium text-[var(--gp-color-text-neutral-primary)]">
+    <div className="flex items-center gap-[var(--gp-space-s)] mt-[4px] flex-wrap">
+      {hasRating && (
+        <span className="flex items-center gap-[4px] shrink-0">
+          <Image
+            src="/restaurant/star.svg"
+            alt="Rating"
+            width={18}
+            height={18}
+            className="w-[18px] h-[18px] object-contain"
+          />
+          <span className="text-[15px] font-medium text-[var(--gp-color-text-neutral-primary)]">
             {rating}
           </span>
-        </div>
+        </span>
       )}
-      <MdOutlineDeliveryDining className="w-[16px] h-[16px] text-[var(--gp-color-text-neutral-tertiary)]" />
-      <MdOutlineSchedule className="w-[16px] h-[16px] text-[var(--gp-color-text-neutral-tertiary)]" />
+      {hasTags && <TagChips tags={tagList} />}
     </div>
   );
 }
@@ -28,7 +39,7 @@ export default function MenuItemCard({
 }) {
   if (!item) return null;
 
-  const { menuItemId, name, description, price, isVeg, image } = item;
+  const { menuItemId, name, description, price, isVeg, image, rating, tagList } = item;
 
   const addButton = (
     <CartCounterButton menuItemId={menuItemId} disabled={isOutOfStock} />
@@ -64,7 +75,7 @@ export default function MenuItemCard({
             </p>
           )}
 
-          <ItemMeta rating={item.rating} />
+          <ItemMeta rating={rating} tagList={tagList} />
 
           <div className="mt-auto pt-[var(--gp-space-s)]">
             <span className="text-[16px] md:text-[18px] font-semibold text-[var(--gp-color-text-neutral-primary)]">

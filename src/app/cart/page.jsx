@@ -219,6 +219,7 @@ export default function CartPage() {
   const handlePlaceOrder = async () => {
     const created = await checkout({
       specialInstructions: buildSpecialInstructions(orderInstruction),
+      roomNumber: selectedRoom,
     });
 
     if (!created || created.length === 0) return;

@@ -92,6 +92,8 @@ export function toRestaurantCard(kitchen) {
     description: kitchen.description || (hotelName ? `Order in from ${hotelName}` : ""),
     image: kitchen.imageUrl || KITCHEN_FALLBACK_IMAGE,
     status: kitchen.status || KITCHEN_STATUS.OFFLINE,
+    openTime: kitchen.openTime || "",
+    closeTime: kitchen.closeTime || "",
     isOpen,
     timing: isOpen ? (closingClock ? `Open Now | Closes ${closingClock}` : "Open Now") : "Closed",
     isOrderable: isOpen,
@@ -155,7 +157,7 @@ export function toMenu(menu) {
   const categories = (menu.categories || []).map((category) => ({
     id: category.id,
     name: category.name || "",
-    description: "",
+    description: category.description || "",
     image: CATEGORY_FALLBACK_IMAGE,
     items: (category.items || []).map((item) => toMenuItem(item, kitchen)).filter(Boolean),
   }));

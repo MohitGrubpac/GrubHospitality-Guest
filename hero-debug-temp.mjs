@@ -1,4 +1,4 @@
-﻿import { chromium } from "playwright-core";
+import { chromium } from "playwright-core";
 import { readFileSync } from "fs";
 
 const CHROME = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe";
@@ -28,9 +28,9 @@ await page.route(`${API}/**`, (route) => {
   const auth = route.request().headers().authorization;
   const ok = (b) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(b) });
   if (p === "/guest-auth/otp/request") return ok({ message: "sent" });
-  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: GUEST });
+  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: { ...GUEST, orders: [] } });
   if (!auth) return route.fulfill({ status: 401, contentType: "application/json", body: "{}" });
-  if (p === "/guests/me") return ok(GUEST);
+  if (p === "/guests/me") return ok({ ...GUEST, orders: [] });
   if (p === "/guest/kitchens") { console.log("MOCK HIT /guest/kitchens -> []"); return ok([]); }
   if (p === "/guest/cart") return ok({ kitchens: [], grandTotalMinor: 0, itemCount: 0 });
   console.log("MOCK 404", p);

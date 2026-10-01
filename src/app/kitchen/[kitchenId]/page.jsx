@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BackButton from "@/component/kitchen/BackButton";
 import RestaurantCard from "@/component/kitchen/RestaurantCard";
+import CategoryMenu from "@/component/kitchen/CategoryMenu";
 import Divider from "@/component/kitchen/Divider";
 import SearchBar from "@/component/kitchen/SearchBar";
 import FilterButtons from "@/component/kitchen/FilterButtons";
@@ -16,13 +17,14 @@ import FilterModal, {
 import SortByModal from "@/component/search/SortByModal";
 import MenuList from "@/component/kitchen/MenuList";
 import MenuDetailModal from "@/component/kitchen/MenuDetailModal";
-import { useKitchenMenu } from "@/hooks/useCatalog";
+import { useKitchenMenu, useKitchens } from "@/hooks/useCatalog";
 
 export default function KitchenPage() {
   const params = useParams();
   const router = useRouter();
   const kitchenId = params?.kitchenId;
   const { menu, isLoading, error } = useKitchenMenu(kitchenId);
+  const { kitchens } = useKitchens();
 
   const [activeCategory, setActiveCategory] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -34,6 +36,26 @@ export default function KitchenPage() {
   const [selectedDietary, setSelectedDietary] = useState([]);
   const [selectedPrices, setSelectedPrices] = useState([]);
   const [selectedCuisines, setSelectedCuisines] = useState([]);
+
+  // Banner meta (type, description, open/close hours) lives on GET /guest/kitchens,
+  // not on the menu payload - look this kitchen up by id.
+  const kitchenMeta = useMemo(
+    () => kitchens.find((entry) => entry.id === kitchenId) || null,
+    [kitchens, kitchenId],
+  );
+
+  const cuisineSegments = useMemo(() => {
+    const raw = kitchenMeta?.type || kitchenMeta?.hotelName || "";
+    return raw
+      .split(",")
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+  }, [kitchenMeta]);
+
+  const hoursText =
+    kitchenMeta?.openTime && kitchenMeta?.closeTime
+      ? `${kitchenMeta.openTime} - ${kitchenMeta.closeTime}`
+      : "";
 
   const categories = useMemo(
     () =>
@@ -175,9 +197,13 @@ export default function KitchenPage() {
             <RestaurantCard
               image={menu?.kitchen?.image}
               name={menu?.kitchenName || "Kitchen"}
-              cuisines={menu?.kitchen?.hotelName ? [menu.kitchen.hotelName] : []}
-              timing={isKitchenOffline ? "Closed" : "Open Now"}
-              description={isKitchenOffline ? "This kitchen is not accepting orders right now." : ""}
+              cuisines={cuisineSegments}
+              timing={isKitchenOffline ? "Closed" : hoursText || "Open Now"}
+              description={
+                isKitchenOffline
+                  ? "This kitchen is not accepting orders right now."
+                  : kitchenMeta?.description || ""
+              }
               isOpen={Boolean(menu) && !isKitchenOffline}
             />
           </div>
@@ -219,9 +245,6 @@ export default function KitchenPage() {
                 ) : (
                   <MenuList
                     menuData={filteredMenu}
-                    categories={categories}
-                    activeCategory={activeCategory}
-                    onSelectCategory={handleSelectCategory}
                     onMenuItemClick={setSelectedItem}
                   />
                 )}
@@ -260,6 +283,18 @@ export default function KitchenPage() {
             <MenuDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
           )}
         </main>
+
+        {/* Floating category menu - pinned bottom-right above the dock, popup opens upward */}
+        <div
+          className="absolute right-[16px] z-40"
+          style={{ bottom: "calc(var(--bottom-dock-h, 0px) + 16px)" }}
+        >
+          <CategoryMenu
+            categories={categories}
+            activeCategory={activeCategory}
+            onSelectCategory={handleSelectCategory}
+          />
+        </div>
       </div>
     </div>
   );

@@ -35,11 +35,11 @@ export function clearCart() {
 }
 
 /** POST /guest/cart/checkout - returns one order per kitchen */
-export function checkoutGuestCart({ specialInstructions } = {}) {
-  return apiClient.post(
-    "/guest/cart/checkout",
-    specialInstructions ? { specialInstructions } : {},
-  );
+export function checkoutGuestCart({ specialInstructions, roomNumber } = {}) {
+  return apiClient.post("/guest/cart/checkout", {
+    ...(specialInstructions ? { specialInstructions } : {}),
+    ...(roomNumber ? { roomNumber: String(roomNumber) } : {}),
+  });
 }
 
 function clampQuantity(value, fallback) {

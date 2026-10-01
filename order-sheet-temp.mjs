@@ -10,6 +10,23 @@ const rec = (n, p, d = "") => { results.push({ n, p }); console.log(`${p ? "PASS
 
 const GUEST = JSON.parse(readFileSync("guest-me-fixture.json", "utf8"));
 
+const ORDER = {
+  id: "ord-1",
+  orderCode: "GH-1001",
+  status: "NEW",
+  restaurantId: "56344e3b-0241-4cf2-96ca-1e85c0b9dbd7",
+  hotelName: "Hyatt Place — Airport",
+  guestId: GUEST.id,
+  guestName: "Aarav Mehta",
+  roomNumber: "1204",
+  items: [{ menuItemId: "m-6", itemName: "Butter Chicken", unitPriceMinor: 48000, quantity: 1 }],
+  totalMinor: 48000,
+  currency: "INR",
+  placedAt: new Date().toISOString(),
+  specialInstructions: null,
+  cancelReason: null,
+};
+
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
 const page = await ctx.newPage();
@@ -24,10 +41,21 @@ await page.route(`${API}/**`, (route) => {
   if (p === "/guests/me") return ok({ ...GUEST, orders: [] });
   if (p === "/guest/kitchens") return ok([]);
   if (p === "/guest/cart") return ok({ kitchens: [], grandTotalMinor: 0, itemCount: 0 });
+  if (p === "/guest/orders/ord-1") return ok(ORDER);
+  if (p === "/guest/orders") return ok([ORDER]);
   return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
 });
-await page.addInitScript(() => localStorage.clear());
+await page.addInitScript(() => {
+  if (!sessionStorage.getItem("harness-cleared")) {
+    localStorage.clear();
+    sessionStorage.setItem("harness-cleared", "1");
+  }
+});
+await page.addInitScript(() => {
+  localStorage.setItem("grubpac.trackedOrderIds", JSON.stringify(["ord-1"]));
+});
 
+// Login
 await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector('input[placeholder="Mobile number or email"]', { timeout: 20000 });
 await page.fill('input[placeholder="Mobile number or email"]', "guest.demo@hyatt.grubpac.com");
@@ -43,22 +71,36 @@ if (page.url().includes("/room-selection")) {
   await page.locator("button:has-text('Skip')").click();
 }
 await page.waitForURL("**/home", { timeout: 20000 });
-await page.waitForSelector("text=Welcome,", { timeout: 20000 });
-await page.waitForTimeout(600);
 
-const hero = page.locator("h1");
-const title = (await hero.first().innerText()).trim();
-const body = await page.locator("body").innerText();
+// Expand the docked order-status panel
+const dockBtn = page.locator('button[aria-expanded][class*="justify-between"]');
+await dockBtn.waitFor({ timeout: 20000 });
+await dockBtn.click();
+await page.waitForSelector('text=VIEW DETAILS', { timeout: 5000 });
 
-rec("banner title is hotel.name", title === "Hyatt Hotels", title);
-rec("banner line below is hotel.address", body.includes("Jhandedalan,Delhi"));
-rec("stay hotel name no longer in banner headline", title !== "Hyatt Place — Airport", title);
-rec("guest name still above title", body.includes("Welcome, Aarav Mehta"));
-rec("no stray restaurant cards with empty kitchens", !body.includes("Good Restra"));
+const geo = await page.evaluate(() => {
+  const close = document.querySelector('button[aria-label="Close order status panel"]');
+  const sheet = close?.parentElement;
+  if (!close || !sheet) return null;
+  const c = close.getBoundingClientRect();
+  const s = sheet.getBoundingClientRect();
+  return {
+    centered: Math.abs((c.left + c.width / 2) - (s.left + s.width / 2)) <= 4,
+    offsetAbove: Math.round(s.top - (c.top + c.height / 2)),
+    sheetTop: Math.round(s.top),
+    closeCenterY: Math.round(c.top + c.height / 2),
+    visible: c.width > 0 && c.top >= 0,
+  };
+});
+rec("close button horizontally centered", Boolean(geo) && geo.centered, JSON.stringify(geo));
+rec("close button sits higher above sheet edge", Boolean(geo) && geo.offsetAbove >= 6, JSON.stringify(geo));
 
-await page.evaluate(() => window.scrollTo(0, 0));
-await page.waitForTimeout(300);
-await page.screenshot({ path: "hero-hotel-name.png" });
+const copy = await page.locator("body").innerText();
+rec("header shows highlighted received copy", copy.includes("We've successfully received your order."));
+rec("step subtitles match figma", copy.includes("Done") && copy.includes("In Process...") && copy.includes("Est. 15 Minutes"));
+rec("VIEW DETAILS footer present", copy.includes("VIEW DETAILS"));
+
+await page.screenshot({ path: "order-status-sheet.png" });
 await ctx.close();
 await browser.close();
 

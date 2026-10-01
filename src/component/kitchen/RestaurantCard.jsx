@@ -33,6 +33,13 @@ export default function RestaurantCard({
             <span className="text-[12px] font-medium text-white">
               Open Now
             </span>
+            <Image
+              src="/restaurant/key.svg"
+              alt="Key"
+              width={14}
+              height={14}
+              className="w-3.5 h-3.5 object-contain"
+            />
           </div>
         )}
       </div>
@@ -44,39 +51,38 @@ export default function RestaurantCard({
           {name}
         </h2>
 
-        {/* Cuisine Tags and Timing */}
-        <div className="flex items-center gap-[8px] flex-wrap">
-          {cuisines.map((cuisine, index) => (
-            <span key={index} className="flex items-center gap-[8px]">
-              <span className="text-[14px] font-medium text-[var(--gp-color-text-brand-primary)]">
-                {cuisine}
-              </span>
-              {index < cuisines.length - 1 && (
-                <span className="text-[14px] text-[var(--gp-color-text-neutral-tertiary)]">
-                  •
+        {/* Cuisine Types and Timing */}
+        <div className="flex items-center justify-between gap-[8px] flex-wrap">
+          {cuisines.length > 0 && (
+            <div className="flex items-center gap-[8px] flex-wrap min-w-0">
+              {cuisines.map((cuisine, index) => (
+                <span key={index} className="flex items-center gap-[8px]">
+                  <span className="text-[14px] font-medium uppercase text-[var(--gp-color-text-brand-primary)]">
+                    {cuisine}
+                  </span>
+                  {index < cuisines.length - 1 && (
+                    <span className="text-[14px] text-[var(--gp-color-text-neutral-tertiary)]">
+                      •
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-          ))}
+              ))}
+            </div>
+          )}
 
           {timing && (
-            <>
+            <div className="flex items-center gap-[4px] shrink-0">
+              <MdOutlineAccessTime className="w-4 h-4 text-[var(--gp-color-text-neutral-tertiary)]" />
               <span className="text-[14px] text-[var(--gp-color-text-neutral-tertiary)]">
-                •
+                {timing}
               </span>
-              <div className="flex items-center gap-[4px]">
-                <MdOutlineAccessTime className="w-4 h-4 text-[var(--gp-color-text-neutral-tertiary)]" />
-                <span className="text-[14px] text-[var(--gp-color-text-neutral-tertiary)]">
-                  {timing}
-                </span>
-              </div>
-            </>
+            </div>
           )}
         </div>
 
         {/* Description */}
         {description && (
-          <p className="text-[14px] leading-[22px] text-[var(--gp-color-text-neutral-secondary)]">
+          <p className="text-[14px] leading-[22px] italic text-[var(--gp-color-text-neutral-secondary)]">
             {description}
           </p>
         )}

@@ -33,7 +33,7 @@ await page.route(`${API}/**`, (route) => {
   const fail = (s, b) => route.fulfill({ status: s, contentType: "application/json", body: JSON.stringify(b) });
 
   if (p === "/guest-auth/otp/request") return ok({ message: "sent" });
-  if (p === "/guest-auth/login") return ok({ accessToken: EXPIRED, refreshToken: "r1", guest: GUEST });
+  if (p === "/guest-auth/login") return ok({ accessToken: EXPIRED, refreshToken: "r1", guest: { ...GUEST, orders: [] } });
 
   if (p === "/guest-auth/refresh") {
     hits.refresh += 1;
@@ -53,7 +53,7 @@ await page.route(`${API}/**`, (route) => {
   if (p === "/guests/me") {
     hits.meBearer.push(auth.replace("Bearer ", ""));
     if (mode !== "ok") return fail(401, { message: "access expired" });
-    return ok(GUEST);
+    return ok({ ...GUEST, orders: [] });
   }
   if (p === "/guest/kitchens") return ok([]);
   if (p === "/guest/cart") return ok({ kitchens: [], grandTotalMinor: 0, itemCount: 0 });

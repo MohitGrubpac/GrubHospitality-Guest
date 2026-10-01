@@ -69,9 +69,9 @@ await page.route(`${API}/**`, (route) => {
   const auth = route.request().headers().authorization;
   const ok = (b) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(b) });
   if (p === "/guest-auth/otp/request") return ok({ message: "sent" });
-  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: GUEST });
+  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: { ...GUEST, orders: [] } });
   if (!auth) return route.fulfill({ status: 401, contentType: "application/json", body: "{}" });
-  if (p === "/guests/me") return ok(GUEST);
+  if (p === "/guests/me") return ok({ ...GUEST, orders: [] });
   if (p === "/guest/kitchens") return ok(KITCHENS);
   const menuMatch = p.match(/^\/guest\/kitchens\/([^/]+)\/menu$/);
   if (menuMatch && MENUS[menuMatch[1]]) return ok(MENUS[menuMatch[1]]);
