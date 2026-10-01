@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import CartCounterButton from "@/component/ui/CartCounterButton";
+import TagChips from "@/component/ui/TagChips";
 import { KITCHEN_FALLBACK_IMAGE } from "@/lib/adapters/catalogAdapter";
 
 export default function DishCard({ dish, onSelectDish }) {
@@ -28,6 +29,18 @@ export default function DishCard({ dish, onSelectDish }) {
         <span className="text-xs text-[#6b7971] font-medium truncate">
           {dish.kitchenName}
         </span>
+
+        {(dish.rating > 0 || (dish.tagList && dish.tagList.length > 0)) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {dish.rating > 0 && (
+              <span className="flex items-center gap-1 shrink-0">
+                <Image src="/restaurant/star.svg" alt="Rating" width={16} height={16} className="w-4 h-4 object-contain" />
+                <span className="text-xs font-semibold text-[#03130a]">{dish.rating}</span>
+              </span>
+            )}
+            <TagChips tags={dish.tagList} />
+          </div>
+        )}
 
         {dish.isOutOfStock && (
           <span className="self-start text-[11px] font-semibold uppercase tracking-wide text-[#b42318] bg-[#fee4e2] rounded px-[6px] py-[2px]">

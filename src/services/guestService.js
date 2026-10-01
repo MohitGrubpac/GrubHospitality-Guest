@@ -7,15 +7,15 @@ export function getGuestProfile() {
 
 /**
  * PATCH /guests/me
- * All fields optional; email and phone are not editable here.
+ *
+ * The endpoint validates the body strictly and currently accepts `name` only -
+ * anything else (including `roomNumber`) is rejected with 400. Rooms live on the
+ * reservation (`stay.roomNumbers[]`) and are chosen on the device, not patched here.
  */
 export function updateGuestProfile(patch) {
   const payload = {};
 
   if (patch.name !== undefined) payload.name = patch.name;
-  if (patch.roomNumber !== undefined) payload.roomNumber = patch.roomNumber;
-  if (patch.checkInAt !== undefined) payload.checkInAt = patch.checkInAt;
-  if (patch.checkOutAt !== undefined) payload.checkOutAt = patch.checkOutAt;
 
   return apiClient.patch("/guests/me", payload);
 }

@@ -50,7 +50,7 @@ function matchesQuery(dish, query) {
     dish.name.toLowerCase().includes(q) ||
     (dish.kitchenName || "").toLowerCase().includes(q) ||
     (dish.description || "").toLowerCase().includes(q) ||
-    (dish.tags || []).some((tag) => tag.toLowerCase().includes(q))
+    (dish.tags || []).some((tag) => String(tag ?? "").toLowerCase().includes(q))
   );
 }
 
@@ -60,14 +60,15 @@ function matchesQuery(dish, query) {
  */
 export function useDishFilters() {
   const filterDishes = useCallback(
-    (dishes, { query, isVegOnly, cuisines, prices, dietary, sort } = {}) => {
+    (dishes, { query, isVegOnly, cuisines, prices, dietary, sort, minRating } = {}) => {
       const result = (dishes || []).filter(
         (dish) =>
           matchesQuery(dish, query) &&
           (!isVegOnly || dish.isVeg === true) &&
           (dietary || []).every((tag) => matchesDietaryTag(dish, tag)) &&
           matchesCuisine(dish, cuisines || []) &&
-          matchesPrice(dish, prices || []),
+          matchesPrice(dish, prices || []) &&
+          (!minRating || (typeof dish.rating === "number" && dish.rating >= minRating)),
       );
 
       const sorted = [...result];
@@ -75,14 +76,23 @@ export function useDishFilters() {
         sorted.sort((a, b) => a.price - b.price);
       } else if (sort === "price_high_low") {
         sorted.sort((a, b) => b.price - a.price);
+      } else if (sort === "rating_high_low") {
+        sorted.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      } else if (sort === "rating_low_high") {
+        sorted.sort((a, b) => (a.rating || 0) - (b.rating || 0));
       }
       return sorted;
     },
     [],
   );
 
-  /** Groups dishes under their kitchen for the "restaurant" tab. */
-  const groupDishesByKitchen = useCallback((dishes, kitchens, query) => {
+  /**
+   * Groups dishes under their kitchen for the "restaurant" tab.
+   * Dishes arrive already query-filtered (see filterDishes), so a kitchen is
+   * relevant when it has at least one matching dish — kitchen-name matching is
+   * already covered by matchesQuery via dish.kitchenName.
+   */
+  const groupDishesByKitchen = useCallback((dishes, kitchens) => {
     const byKitchen = new Map();
     (dishes || []).forEach((dish) => {
       const list = byKitchen.get(dish.restaurantId) || [];
@@ -90,21 +100,12 @@ export function useDishFilters() {
       byKitchen.set(dish.restaurantId, list);
     });
 
-    const q = (query || "").trim().toLowerCase();
-
     return (kitchens || [])
       .map((kitchen) => ({
         restaurant: kitchen,
         dishes: byKitchen.get(kitchen.id) || [],
       }))
-      .filter((group) => {
-        if (group.dishes.length === 0) return false;
-        if (!q) return true;
-        return (
-          group.restaurant.name.toLowerCase().includes(q) ||
-          (group.restaurant.hotelName || "").toLowerCase().includes(q)
-        );
-      });
+      .filter((group) => group.dishes.length > 0);
   }, []);
 
   return { filterDishes, groupDishesByKitchen };

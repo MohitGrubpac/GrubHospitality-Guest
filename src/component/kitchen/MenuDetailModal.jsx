@@ -3,12 +3,18 @@
 import Image from "next/image";
 import { MdClose, MdOutlineDeliveryDining, MdOutlineSchedule } from "react-icons/md";
 import CartCounterButton from "@/component/ui/CartCounterButton";
+import TagChips from "@/component/ui/TagChips";
 import VegIndicator from "@/component/ui/VegIndicator";
 
 export default function MenuDetailModal({ item, onClose }) {
   if (!item) return null;
 
   const { menuItemId, name, description, price, isVeg, image, isOutOfStock } = item;
+  const tagChips =
+    item.tagList ??
+    (Array.isArray(item.tags)
+      ? item.tags.map((tag) => (typeof tag === "string" ? { name: tag, icon: "" } : tag))
+      : []);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -78,19 +84,7 @@ export default function MenuDetailModal({ item, onClose }) {
               </p>
             )}
 
-            {Array.isArray(item.tags) && item.tags.length > 0 && (
-              <div className="flex items-center gap-[8px] flex-wrap">
-                {item.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-[11px] font-medium uppercase tracking-wide text-[var(--gp-color-text-neutral-secondary)] bg-[var(--gp-color-bg-neutral-secondary)] rounded px-[8px] py-[4px]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+            {tagChips.length > 0 && <TagChips tags={tagChips} />}          </div>
         </div>
       </div>
     </div>

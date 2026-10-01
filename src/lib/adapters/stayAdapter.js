@@ -97,6 +97,7 @@ export function buildStays(guest, orders, rows) {
       isCurrent: status === "Current Stay",
       hotelName: guest.hotelName,
       roomNumber: guest.roomNumber,
+      roomNumbers: guest.roomNumbers || [],
       reservationId: guest.reservationId,
       checkInAt: guest.checkInAt,
       checkOutAt: guest.checkOutAt,

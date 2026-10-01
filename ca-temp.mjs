@@ -1,4 +1,4 @@
-import { fromMinor } from "@/lib/money";
+import { fromMinor } from "./ca-stub1.mjs";
 
 export const KITCHEN_FALLBACK_IMAGE = "/food-items/restaurant.jpg";
 export const CATEGORY_FALLBACK_IMAGE = "/kitchen/kitch.jpg";

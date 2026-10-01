@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import CartCounterButton from "@/component/ui/CartCounterButton";
+import TagChips from "@/component/ui/TagChips";
 import { KITCHEN_FALLBACK_IMAGE } from "@/lib/adapters/catalogAdapter";
 
 export default function RestaurantDishGroupCard({
@@ -53,6 +54,17 @@ export default function RestaurantDishGroupCard({
                   className="w-3.5 h-3.5 object-contain"
                 />
                 <h4 className="text-xs font-bold text-[#03130a] line-clamp-2">{dish.name}</h4>
+                {(dish.rating > 0 || (dish.tagList && dish.tagList.length > 0)) && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {dish.rating > 0 && (
+                      <span className="flex items-center gap-0.5 shrink-0">
+                        <Image src="/restaurant/star.svg" alt="Rating" width={14} height={14} className="w-3.5 h-3.5 object-contain" />
+                        <span className="text-[10px] font-semibold text-[#03130a]">{dish.rating}</span>
+                      </span>
+                    )}
+                    <TagChips tags={dish.tagList} max={3} size="sm" />
+                  </div>
+                )}
                 <div className="text-xs font-bold text-[#03130a] mt-1">₹ {dish.price}</div>
               </div>
 
@@ -67,7 +79,9 @@ export default function RestaurantDishGroupCard({
               </div>
             </div>
 
-            <CartCounterButton menuItemId={dish.menuItemId} disabled={dish.isOutOfStock} />
+            <div className="flex justify-end w-full">
+              <CartCounterButton menuItemId={dish.menuItemId} disabled={dish.isOutOfStock} />
+            </div>
           </div>
         ))}
       </div>

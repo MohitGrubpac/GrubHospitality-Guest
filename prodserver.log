@@ -3,5 +3,5 @@ npm notice run next start --port 3222
 ▲ Next.js 16.3.0
 - Local:         http://localhost:3222
 - Network:       http://192.168.1.41:3222
-✓ Ready in 580ms
-✓ Running next.config.mjs took 64ms
+✓ Ready in 377ms
+✓ Running next.config.mjs took 39ms

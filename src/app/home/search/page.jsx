@@ -34,6 +34,7 @@ function SearchResultsContent() {
   const [selectedCuisines, setSelectedCuisines] = useState([]);
   const [selectedPrices, setSelectedPrices] = useState([]);
   const [selectedDietary, setSelectedDietary] = useState([]);
+  const [isRated3Only, setIsRated3Only] = useState(false);
 
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -48,6 +49,7 @@ function SearchResultsContent() {
         prices: selectedPrices,
         dietary: selectedDietary,
         sort: selectedSort,
+        minRating: isRated3Only ? 3 : null,
       }),
     [
       filterDishes,
@@ -58,12 +60,13 @@ function SearchResultsContent() {
       selectedPrices,
       selectedDietary,
       selectedSort,
+      isRated3Only,
     ],
   );
 
   const restaurantGroups = useMemo(
-    () => groupDishesByKitchen(filteredDishes, kitchens, query),
-    [groupDishesByKitchen, filteredDishes, kitchens, query],
+    () => groupDishesByKitchen(filteredDishes, kitchens),
+    [groupDishesByKitchen, filteredDishes, kitchens],
   );
 
   const isEmptyResult = !isLoading && filteredDishes.length === 0;
@@ -105,6 +108,8 @@ function SearchResultsContent() {
           <SearchFilterBar
             onOpenFilter={() => setIsFilterOpen(true)}
             onOpenSort={() => setIsSortOpen(true)}
+            isRated3Only={isRated3Only}
+            onToggleRated3={() => setIsRated3Only((v) => !v)}
           />
         </div>
 
@@ -140,7 +145,9 @@ function SearchResultsContent() {
               ))
             ) : (
               <div className="text-center py-12 text-sm text-[#6b7971]">
-                No kitchens found matching &ldquo;{query}&rdquo;
+                {isEmptyResult
+                  ? `No kitchens found matching \u201c${query}\u201d`
+                  : "No kitchens available right now."}
               </div>
             )}
           </div>

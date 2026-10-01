@@ -5,23 +5,21 @@ import { ApiError } from "@/lib/api-client";
 import { showError, showSuccess } from "@/component/ui/Toast";
 
 /**
- * PATCH /guests/me accepts name, roomNumber, checkInAt and checkOutAt only -
- * email and phone are read-only. The parent remounts this with a `key` on the
- * saved profile so the fields always start from the current values.
+ * PATCH /guests/me validates strictly and accepts `name` only - sending `roomNumber`
+ * is rejected with 400. Rooms come from the reservation (GET /guests/me `stay`) and are
+ * changed from the room switcher, not the profile editor.
  */
 export default function ProfileEditView({ user, onSave, onCancel }) {
   const [name, setName] = useState(user?.name || "");
-  const [roomNumber, setRoomNumber] = useState(user?.roomNumber || "");
   const [isSaving, setIsSaving] = useState(false);
+
+  const numbersLabel = (user?.roomNumbers?.length || 0) > 1 ? "s" : "";
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     const patch = {};
     if (name.trim() && name.trim() !== user?.name) patch.name = name.trim();
-    if (roomNumber.trim() && roomNumber.trim() !== user?.roomNumber) {
-      patch.roomNumber = roomNumber.trim();
-    }
 
     if (Object.keys(patch).length === 0) {
       onCancel();
@@ -71,19 +69,20 @@ export default function ProfileEditView({ user, onSave, onCancel }) {
           </div>
 
           <div className="flex flex-col gap-2 w-full">
-            <label htmlFor="edit-room" className="text-[16px] leading-[24px] text-[#37493F]">
-              Room Number
-            </label>
-            <div className="w-full h-[44px] px-4 py-3 bg-white border border-[#E0E3E1] rounded-lg flex items-center focus-within:border-[#FF3333] transition-colors">
-              <input
-                id="edit-room"
-                type="text"
-                value={roomNumber}
-                onChange={(event) => setRoomNumber(event.target.value)}
-                maxLength={12}
-                className="w-full bg-transparent text-[14px] leading-[20px] text-[#03130A] outline-none"
-              />
+            <span className="text-[16px] leading-[24px] text-[#37493F]">
+              Room{numbersLabel}
+            </span>
+            <div className="w-full h-[44px] px-4 py-3 bg-[#f7f8fa] border border-[#E0E3E1] rounded-lg flex items-center">
+              <span className="text-[14px] leading-[20px] text-[#6B7971]">
+                {user?.roomNumbers?.length
+                  ? user.roomNumbers.map((room) => `Room ${room}`).join(", ")
+                  : "Not provided"}
+              </span>
             </div>
+            <p className="text-[11px] leading-[16px] text-[#6B7971]">
+              Rooms are managed by your reservation. Use the room switcher on the cart to
+              choose where your order is delivered.
+            </p>
           </div>
 
           <div className="flex flex-col gap-2 w-full">

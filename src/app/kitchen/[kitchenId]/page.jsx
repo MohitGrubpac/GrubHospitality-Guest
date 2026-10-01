@@ -67,7 +67,7 @@ export default function KitchenPage() {
             (item) =>
               item.name.toLowerCase().includes(q) ||
               (item.description || "").toLowerCase().includes(q) ||
-              (item.tags || []).some((tag) => tag.toLowerCase().includes(q)),
+              (item.tags || []).some((tag) => String(tag ?? "").toLowerCase().includes(q)),
           ),
         }))
         .filter((category) => category.items.length > 0);

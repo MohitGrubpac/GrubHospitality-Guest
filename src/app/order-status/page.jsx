@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/component/providers/AuthProvider";
+import { useRoom } from "@/component/providers/RoomProvider";
 import { useOrders } from "@/component/providers/OrdersProvider";
 import VegIndicator from "@/component/ui/VegIndicator";
 import { formatTime12 } from "@/lib/date";
@@ -81,6 +82,7 @@ function EmptyState() {
 export default function OrderStatusPage() {
   const router = useRouter();
   const { guest } = useAuth();
+  const { selectedRoom } = useRoom();
   const { activeOrder, orders, isLoading, hasActiveOrder } = useOrders();
 
   if (isLoading && !activeOrder) {
@@ -225,7 +227,7 @@ export default function OrderStatusPage() {
               </div>
               <div className="flex flex-col text-right">
                 <span className="text-sm font-bold text-[#03130a]">
-                  {activeOrder.roomNumber || guest?.roomNumber || "-"}
+                  {activeOrder.roomNumber || selectedRoom || "-"}
                 </span>
                 <span className="text-[11px] text-[#6b7971] mt-0.5">Room No.</span>
               </div>

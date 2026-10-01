@@ -39,15 +39,19 @@ export function AuthProvider({ children }) {
 
   const status = hasStoredToken ? sessionStatus : AUTH_STATUS.ANONYMOUS;
 
+  // Returns the *adapted* guest, so callers get the normalised shape
+  // (e.g. `roomNumbers`) rather than the raw API payload.
   const applySession = useCallback((session) => {
     setTokens({
       accessToken: session?.accessToken ?? null,
       refreshToken: session?.refreshToken ?? null,
     });
-    setGuest(toGuestUser(session?.guest));
+
+    const adapted = toGuestUser(session?.guest);
+    setGuest(adapted);
     setSessionStatus(AUTH_STATUS.AUTHENTICATED);
     setError(null);
-    return session?.guest ?? null;
+    return adapted;
   }, []);
 
   const endSession = useCallback(() => {

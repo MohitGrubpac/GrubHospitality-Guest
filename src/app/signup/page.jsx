@@ -101,7 +101,12 @@ function SignupContent() {
         if (cancelled) return;
         setReservation(details);
         setName(details?.name || "");
-        setRoomNumber(details?.roomNumber || "");
+        // The reservation may list several rooms; signup prefills the first.
+        setRoomNumber(
+          Array.isArray(details?.roomNumbers)
+            ? details.roomNumbers[0] || ""
+            : details?.roomNumber || "",
+        );
         setChannel(details?.email ? OTP_CHANNEL.EMAIL : OTP_CHANNEL.PHONE);
         setLoadError(null);
       })

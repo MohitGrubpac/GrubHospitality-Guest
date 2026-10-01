@@ -6,7 +6,6 @@ import LoginHeader from "@/component/login/LoginHeader";
 import OtpLoginModal, { maskDestination } from "@/component/login/OtpLoginModal";
 import OtpVerifyModal from "@/component/login/OtpVerifyModal";
 import { useAuth } from "@/component/providers/AuthProvider";
-import { useRoom } from "@/component/providers/RoomProvider";
 import { ApiError } from "@/lib/api-client";
 import { OTP_PURPOSE } from "@/services/authService";
 import { showError, showOtpErrorToast, showOtpSuccessToast } from "@/component/ui/Toast";
@@ -19,7 +18,6 @@ function LoginContent() {
   const searchParams = useSearchParams();
 
   const { requestOtp, loginWithOtp, loginWithGoogle, organizationId, isSubmitting } = useAuth();
-  const { setSelectedRoom } = useRoom();
 
   const [step, setStep] = useState("login");
   const [destination, setDestination] = useState(null);
@@ -27,11 +25,22 @@ function LoginContent() {
 
   const nextRoute = searchParams?.get("next");
 
-  const goHome = async () => {
-    if (nextRoute && nextRoute.startsWith("/")) {
+  const goHome = async (guest) => {
+    // A reservation can cover several rooms - make the guest choose one first.
+    // Read the raw `stay.roomNumbers` too, in case the adapted shape is not what
+    // we are handed (e.g. a future backend change).
+    const rooms = guest?.roomNumbers ?? guest?.stay?.roomNumbers ?? [];
+
+    if (Array.isArray(rooms) && rooms.length > 1) {
+      router.replace("/room-selection");
+      return;
+    }
+
+    if (nextRoute && nextRoute.startsWith("/") && nextRoute !== "/room-selection") {
       router.replace(nextRoute);
       return;
     }
+
     router.replace("/home");
   };
 
@@ -75,11 +84,7 @@ function LoginContent() {
 
       showOtpSuccessToast("OTP Verified", `Welcome back, ${guest?.name || "guest"}.`);
 
-      if (guest?.roomNumber) {
-        await setSelectedRoom(guest.roomNumber);
-      }
-
-      goHome();
+      goHome(guest);
     } catch (loginError) {
       if (loginError instanceof ApiError && BLOCKED_CODES.includes(loginError.code)) {
         setShowGuestNotFound(true);
@@ -124,8 +129,7 @@ function LoginContent() {
     try {
       const guest = await loginWithGoogle({ idToken });
       showOtpSuccessToast("Signed in", `Welcome, ${guest?.name || "guest"}.`);
-      if (guest?.roomNumber) await setSelectedRoom(guest.roomNumber);
-      goHome();
+      goHome(guest);
     } catch (googleError) {
       showOtpErrorToast(
         "Google sign in failed",

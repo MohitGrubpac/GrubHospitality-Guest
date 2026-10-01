@@ -95,10 +95,12 @@ function DeliveryDetails({ selectedRoom, onChangeRoom, isMultipleRooms, guest })
         </div>
         <div className="flex flex-col gap-0.5 items-end">
           <div className="flex items-center gap-1">
-            <span className="font-semibold text-[#03130a]">{selectedRoom || "-"}</span>
+            <span className="font-semibold text-[#03130a]">
+              {selectedRoom ? `Room ${selectedRoom}` : "-"}
+            </span>
           </div>
           <span className="text-xs text-[#6b7971]">
-            Room No.{" "}
+            Delivery Room{" "}
             {isMultipleRooms && (
               <button
                 type="button"
@@ -452,7 +454,7 @@ export default function CartPage() {
         </button>
         {!selectedRoom && (
           <p className="text-[11px] text-center text-[#b42318] mt-2">
-            No room number on your profile. Please update it before ordering.
+            No room is linked to your reservation. Please contact the front desk.
           </p>
         )}
       </div>
@@ -465,11 +467,9 @@ export default function CartPage() {
         currentRoom={selectedRoom}
         onConfirm={(room) => {
           setIsRoomSwitchOpen(false);
-          if (!room) {
-            showError("No room number available on your profile.");
-            return;
+          if (room && !setSelectedRoom(room)) {
+            showError("That room is not part of your reservation.");
           }
-          setSelectedRoom(room);
         }}
       />
     </div>

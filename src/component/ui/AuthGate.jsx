@@ -34,7 +34,6 @@ export default function AuthGate({ children }) {
       router.replace("/home");
     }
   }, [status, isPublic, pathname, router]);
-
   if (status === AUTH_STATUS.LOADING) {
     return <LoadingScreen duration={1400} />;
   }

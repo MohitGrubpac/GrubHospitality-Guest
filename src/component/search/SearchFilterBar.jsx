@@ -2,7 +2,12 @@
 
 import Image from "next/image";
 
-export default function SearchFilterBar({ onOpenFilter, onOpenSort }) {
+export default function SearchFilterBar({
+  onOpenFilter,
+  onOpenSort,
+  isRated3Only = false,
+  onToggleRated3,
+}) {
   return (
     <div className="flex items-center gap-2 overflow-x-auto py-1 scrollbar-hide w-full shrink-0">
       {/* Filter  */}
@@ -49,6 +54,27 @@ export default function SearchFilterBar({ onOpenFilter, onOpenSort }) {
           height={12}
           className="w-3 h-3 object-contain"
         />
+      </button>
+
+      {/* Rated 3+ quick filter */}
+      <button
+        type="button"
+        onClick={onToggleRated3}
+        aria-pressed={isRated3Only}
+        className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-bold transition-colors shrink-0 cursor-pointer uppercase ${
+          isRated3Only
+            ? "bg-[#fe480b] border-[#fe480b] text-white"
+            : "bg-white border-[#d2d7d4] text-[#6b7971] hover:bg-slate-50"
+        }`}
+      >
+        <Image
+          src="/restaurant/star.svg"
+          alt="Rated"
+          width={14}
+          height={14}
+          className="w-3.5 h-3.5 object-contain"
+        />
+        <span>rated 3+</span>
       </button>
     </div>
   );

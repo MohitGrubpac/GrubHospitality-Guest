@@ -23,12 +23,21 @@ export default function RestaurantCard({ restaurant }) {
         <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 flex items-center gap-1.5 text-white">
           <Image
             src="/restaurant/key.svg"
-            alt="Clock/Key"
+            alt="Status"
             width={12}
             height={12}
             className="w-3 h-3 object-contain"
           />
-          <span className="text-[11px] font-medium tracking-wide">{restaurant.timing}</span>
+          <span className="text-[11px] font-medium tracking-wide whitespace-nowrap">
+            {restaurant.timing}
+          </span>
+          <Image
+            src="/restaurant/key.svg"
+            alt=""
+            width={12}
+            height={12}
+            className="w-3 h-3 object-contain rotate-180"
+          />
         </div>
       </div>
 

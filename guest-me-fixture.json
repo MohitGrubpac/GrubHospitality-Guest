@@ -1,0 +1,190 @@
+{
+    "id": "ef8fe94e-7ac7-40b7-832b-f2d2a3249e98",
+    "organizationId": "01a1a2ad-980a-4c33-9073-f0b61e7bdbd8",
+    "status": "ACTIVE",
+    "name": "Aarav Mehta",
+    "email": "guest.demo@hyatt.grubpac.com",
+    "phone": "+919876543210",
+    "createdAt": "2026-10-01T04:55:59.713Z",
+    "updatedAt": "2026-10-01T05:28:55.619Z",
+    "hotel": {
+        "id": "01a1a2ad-980a-4c33-9073-f0b61e7bdbd8",
+        "name": "Hyatt Hotels",
+        "address": "Jhandedalan,Delhi",
+        "description": "Premium hotel chain with luxury amenities and world-class dining"
+    },
+    "stay": {
+        "hotelName": "Hyatt Place — Airport",
+        "reservationId": "DEMO-RES-001",
+        "roomNumbers": ["1204", "1205", "1206"],
+        "checkInAt": "2026-10-01T04:55:59.712Z",
+        "checkOutAt": "2026-10-04T04:55:59.712Z"
+    },
+    "orders": [
+        {
+            "id": "c39cf369-3e2d-45d3-a6f4-269333ad3000",
+            "orderCode": "GUEST-DEMO-1",
+            "restaurantId": "56344e3b-0241-4cf2-96ca-1e85c0b9dbd7",
+            "status": "NEW",
+            "guestName": "Aarav Mehta",
+            "roomNumber": "1204",
+            "hotelName": "Hyatt Place — Airport",
+            "hotelAddress": null,
+            "restaurantAddress": null,
+            "restaurantType": "American",
+            "specialInstructions": null,
+            "totalMinor": 32000,
+            "currency": "INR",
+            "placedAt": "2026-10-01T04:55:59.857Z",
+            "scheduledAt": null,
+            "acceptedAt": null,
+            "readyAt": null,
+            "deliveredAt": null,
+            "cancelledAt": null,
+            "cancelReason": null,
+            "cancellationKind": null,
+            "items": [
+                {
+                    "id": "d8b5d4db-07f9-410f-87c3-4f184d04e3b3",
+                    "menuItemId": "8b97050a-66a6-47da-a78b-219598eb4d55",
+                    "itemName": "Paneer Tikka",
+                    "unitPriceMinor": 32000,
+                    "quantity": 1,
+                    "note": null
+                }
+            ]
+        },
+        {
+            "id": "8ddd9f0a-b1c4-4abf-964b-51ad0baf795f",
+            "orderCode": "GUEST-DEMO-2",
+            "restaurantId": "56344e3b-0241-4cf2-96ca-1e85c0b9dbd7",
+            "status": "PREPARING",
+            "guestName": "Aarav Mehta",
+            "roomNumber": "1204",
+            "hotelName": "Hyatt Place — Airport",
+            "hotelAddress": null,
+            "restaurantAddress": null,
+            "restaurantType": "American",
+            "specialInstructions": null,
+            "totalMinor": 32000,
+            "currency": "INR",
+            "placedAt": "2026-10-01T03:56:00.265Z",
+            "scheduledAt": null,
+            "acceptedAt": null,
+            "readyAt": null,
+            "deliveredAt": null,
+            "cancelledAt": null,
+            "cancelReason": null,
+            "cancellationKind": null,
+            "items": [
+                {
+                    "id": "1fe80513-3d3b-46c3-82af-edf6eefbe670",
+                    "menuItemId": "8b97050a-66a6-47da-a78b-219598eb4d55",
+                    "itemName": "Paneer Tikka",
+                    "unitPriceMinor": 32000,
+                    "quantity": 1,
+                    "note": null
+                }
+            ]
+        },
+        {
+            "id": "25e1ed06-d285-46a8-aead-cb00d3269084",
+            "orderCode": "GUEST-DEMO-3",
+            "restaurantId": "56344e3b-0241-4cf2-96ca-1e85c0b9dbd7",
+            "status": "READY",
+            "guestName": "Aarav Mehta",
+            "roomNumber": "1204",
+            "hotelName": "Hyatt Place — Airport",
+            "hotelAddress": null,
+            "restaurantAddress": null,
+            "restaurantType": "American",
+            "specialInstructions": null,
+            "totalMinor": 32000,
+            "currency": "INR",
+            "placedAt": "2026-10-01T02:56:00.469Z",
+            "scheduledAt": null,
+            "acceptedAt": null,
+            "readyAt": null,
+            "deliveredAt": null,
+            "cancelledAt": null,
+            "cancelReason": null,
+            "cancellationKind": null,
+            "items": [
+                {
+                    "id": "aa228feb-7bff-4a6c-aeca-dc700dd4834b",
+                    "menuItemId": "8b97050a-66a6-47da-a78b-219598eb4d55",
+                    "itemName": "Paneer Tikka",
+                    "unitPriceMinor": 32000,
+                    "quantity": 1,
+                    "note": null
+                }
+            ]
+        },
+        {
+            "id": "6e8aa1a0-31a9-44a5-8f0a-8e0b2341ad9f",
+            "orderCode": "GUEST-DEMO-4",
+            "restaurantId": "56344e3b-0241-4cf2-96ca-1e85c0b9dbd7",
+            "status": "DELIVERED",
+            "guestName": "Aarav Mehta",
+            "roomNumber": "1204",
+            "hotelName": "Hyatt Place — Airport",
+            "hotelAddress": null,
+            "restaurantAddress": null,
+            "restaurantType": "American",
+            "specialInstructions": null,
+            "totalMinor": 32000,
+            "currency": "INR",
+            "placedAt": "2026-10-01T01:56:00.663Z",
+            "scheduledAt": null,
+            "acceptedAt": null,
+            "readyAt": null,
+            "deliveredAt": null,
+            "cancelledAt": null,
+            "cancelReason": null,
+            "cancellationKind": null,
+            "items": [
+                {
+                    "id": "4023f1ec-f061-4c6c-a2ac-5c1752e2d9e98",
+                    "menuItemId": "8b97050a-66a6-47da-a78b-219598eb4d55",
+                    "itemName": "Paneer Tikka",
+                    "unitPriceMinor": 32000,
+                    "quantity": 1,
+                    "note": null
+                }
+            ]
+        },
+        {
+            "id": "d2aee7d5-3d89-4f30-812a-93d0e8b5db8f",
+            "orderCode": "GUEST-DEMO-5",
+            "restaurantId": "56344e3b-0241-4cf2-96ca-1e85c0b9dbd7",
+            "status": "CANCELLED",
+            "guestName": "Aarav Mehta",
+            "roomNumber": "1204",
+            "hotelName": "Hyatt Place — Airport",
+            "hotelAddress": null,
+            "restaurantAddress": null,
+            "restaurantType": "American",
+            "specialInstructions": null,
+            "totalMinor": 32000,
+            "currency": "INR",
+            "placedAt": "2026-10-01T00:56:00.861Z",
+            "scheduledAt": null,
+            "acceptedAt": null,
+            "readyAt": null,
+            "deliveredAt": null,
+            "cancelledAt": null,
+            "cancelReason": null,
+            "cancellationKind": null,
+            "items": [
+                {
+                    "id": "b25ce878-ba63-7625effc-b4f184d04",
+                    "menuItemId": "8b97050a-66a6-47da-a78b-219598eb4d55",
+                    "itemName": "Paneer Tikka",
+                    "unitPriceMinor": 32000,
+                    "quantity": 1,
+                    "note": null
+                }
+            ]
+        }
+    ]
+}

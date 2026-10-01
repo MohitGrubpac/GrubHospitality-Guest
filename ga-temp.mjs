@@ -1,5 +1,5 @@
-import { toDisplayDate, toInitials } from "@/lib/adapters/shared";
-import { toActiveOrder } from "@/lib/adapters/orderAdapter";
+import { toDisplayDate, toInitials } from "./ga-stub1.mjs";
+import { toActiveOrder } from "./ga-stub2.mjs";
 
 /**
  * GET /guests/me exists in two shapes:

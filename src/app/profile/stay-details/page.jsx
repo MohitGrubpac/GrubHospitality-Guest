@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import StayCard from "@/component/profile/StayCard";
+import { useRoom } from "@/component/providers/RoomProvider";
 import { useGuestOrders } from "@/hooks/useOrders";
 import { useAuth } from "@/component/providers/AuthProvider";
 import { buildStays, isOrderInStay } from "@/lib/adapters/stayAdapter";
@@ -19,6 +20,7 @@ import { buildStays, isOrderInStay } from "@/lib/adapters/stayAdapter";
 export default function StayDetailsPage() {
   const router = useRouter();
   const { guest, refetchProfile, isLoading: isProfileLoading } = useAuth();
+  const { selectedRoom } = useRoom();
 
   // Re-read the profile so the stay reflects orders placed since sign-in.
   // Keyed on the guest id (not the object) - refetchProfile replaces the guest
@@ -51,8 +53,14 @@ export default function StayDetailsPage() {
   });
 
   const stays = useMemo(
-    () => buildStays(guest, embeddedOrders || orders, embeddedOrders || rows),
-    [guest, embeddedOrders, orders, rows],
+    () =>
+      buildStays(guest, embeddedOrders || orders, embeddedOrders || rows).map((stay) => ({
+        ...stay,
+        // Show the room the guest has deliveries going to, not just the first booked.
+        roomNumber: stay.roomNumbers?.length > 1 ? selectedRoom : stay.roomNumber,
+        roomNumbers: stay.roomNumbers,
+      })),
+    [guest, embeddedOrders, orders, rows, selectedRoom],
   );
 
   const isLoading = isProfileLoading || (!embeddedOrders && areOrdersLoading);
