@@ -1,34 +1,120 @@
 "use client";
 
-import { useState, forwardRef, useImperativeHandle } from "react";
+import { useState } from "react";
 import Image from "next/image";
+import { ApiError } from "@/lib/api-client";
+import { showError } from "@/component/ui/Toast";
+import {
+  isBatchRejected,
+  recordFeedback,
+  recordFeedbackFlat,
+} from "@/services/feedbackService";
+import { writeFeedback } from "@/hooks/useFeedback";
 
-const ShareExperienceCard = forwardRef(function ShareExperienceCard({ order }, ref) {
+/**
+ * Rating + review form. Submit sends one POST /guest/feedback whose `items`
+ * array holds a { menuItemId, rating, review } entry per rated dish (the
+ * overall rating covers a single entry when no per-dish star was given). If
+ * the deployed DTO rejects the batch (400 "property items should not exist"),
+ * the same entries are replayed as flat per-dish calls so the feedback still
+ * records; the submission is then mirrored locally for the history cards.
+ */
+export default function ShareExperienceCard({ order, orderId, feedbackTarget }) {
   const [overallRating, setOverallRating] = useState(0);
   const [itemRatings, setItemRatings] = useState({});
   const [feedback, setFeedback] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const items = order?.items || [
     { id: "i1", name: "Hyderabadi Biryani" },
-    { id: "i2", name: "Muradabadi Biryani" }
+    { id: "i2", name: "Muradabadi Biryani" },
   ];
 
   const handleItemRating = (id, rating) => {
     setItemRatings((prev) => ({ ...prev, [id]: rating }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    if (feedback.trim() || overallRating > 0) {
+    if (submitted || isSubmitting) return;
+
+    const hasRating = overallRating > 0 || Object.values(itemRatings).some((value) => value > 0);
+    if (!feedback.trim() && !hasRating) return;
+
+    const review = feedback.trim();
+    const ratedItems = feedbackTarget
+      ? feedbackTarget.items
+          .map((item) => ({
+            menuItemId: item.menuItemId,
+            rating: itemRatings[item.menuItemId] || 0,
+          }))
+          .filter((entry) => entry.rating > 0)
+      : [];
+
+    const items =
+      ratedItems.length > 0
+        ? ratedItems
+        : overallRating > 0 && feedbackTarget?.items?.length
+          ? feedbackTarget.items.map((item) => ({
+              menuItemId: item.menuItemId,
+              rating: overallRating,
+            }))
+          : [];
+
+    const rating =
+      overallRating > 0
+        ? overallRating
+        : items.length > 0
+          ? Math.round(items.reduce((sum, entry) => sum + entry.rating, 0) / items.length)
+          : 0;
+
+    const batch = {
+      restaurantId: feedbackTarget?.restaurantId,
+      orderId: feedbackTarget?.orderId,
+      guestName: feedbackTarget?.guestName,
+      rating,
+      review,
+      items,
+    };
+
+    setIsSubmitting(true);
+    try {
+      if (rating > 0 && items.length > 0) {
+        try {
+          await recordFeedback(batch);
+        } catch (batchError) {
+          if (!isBatchRejected(batchError)) throw batchError;
+          await Promise.all(
+            items.map((entry) =>
+              recordFeedbackFlat({
+                restaurantId: batch.restaurantId,
+                orderId: batch.orderId,
+                menuItemId: entry.menuItemId,
+                guestName: batch.guestName,
+                rating: entry.rating,
+                review: batch.review,
+              }),
+            ),
+          );
+        }
+      }
+      writeFeedback(orderId, {
+        overallRating,
+        feedback,
+        time: new Date().toISOString(),
+      });
       setSubmitted(true);
+    } catch (submitError) {
+      showError(
+        submitError instanceof ApiError
+          ? submitError.message
+          : "Unable to record your feedback. Please try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  useImperativeHandle(ref, () => ({
-    handleSubmit,
-    submitted,
-  }));
 
   return (
     <div className="w-full bg-white rounded-lg p-4 shadow-2xs border border-[#E0E3E1] flex flex-col gap-3">
@@ -53,11 +139,12 @@ const ShareExperienceCard = forwardRef(function ShareExperienceCard({ order }, r
               key={star}
               type="button"
               onClick={() => setOverallRating(star)}
-              className="cursor-pointer transition-transform hover:scale-110"
+              disabled={submitted || isSubmitting}
+              className="cursor-pointer transition-transform hover:scale-110 disabled:opacity-50"
             >
               <Image
                 src={star <= overallRating ? "/profile/star_filled.svg" : "/profile/star_outline.svg"}
-                alt={`Star ${star}`}
+                alt="Star"
                 width={20}
                 height={20}
                 className="w-5 h-5 object-contain"
@@ -83,11 +170,12 @@ const ShareExperienceCard = forwardRef(function ShareExperienceCard({ order }, r
                   key={star}
                   type="button"
                   onClick={() => handleItemRating(itemId, star)}
-                  className="cursor-pointer transition-transform hover:scale-110"
+                  disabled={submitted || isSubmitting}
+                  className="cursor-pointer transition-transform hover:scale-110 disabled:opacity-50"
                 >
                   <Image
                     src={star <= rating ? "/profile/star_filled.svg" : "/profile/star_outline.svg"}
-                    alt={`Star ${star}`}
+                    alt="Star"
                     width={20}
                     height={20}
                     className="w-5 h-5 object-contain"
@@ -111,14 +199,15 @@ const ShareExperienceCard = forwardRef(function ShareExperienceCard({ order }, r
             placeholder="Loved the meal..."
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            disabled={submitted}
+            disabled={submitted || isSubmitting}
             className="w-full p-3 pr-12 bg-white border border-[#E0E3E1] rounded-lg text-base font-normal text-[#37493F] placeholder:text-[#6B7971] outline-none resize-none"
           />
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitted}
-            className="absolute right-3 bottom-4 w-7 h-7 bg-[#FF4848] border border-[#FF3333] rounded-lg flex items-center justify-center cursor-pointer shadow-xs active:bg-[#e03d06] transition-colors"
+            disabled={submitted || isSubmitting}
+            aria-label="Submit feedback"
+            className="absolute right-3 bottom-4 w-7 h-7 bg-[#FF4848] border border-[#FF3333] rounded-lg flex items-center justify-center cursor-pointer shadow-xs active:bg-[#e03d06] transition-colors disabled:opacity-60"
           >
             <Image
               src="/profile/arrow_right_white.svg"
@@ -137,6 +226,4 @@ const ShareExperienceCard = forwardRef(function ShareExperienceCard({ order }, r
       </div>
     </div>
   );
-});
-
-export default ShareExperienceCard;
+}

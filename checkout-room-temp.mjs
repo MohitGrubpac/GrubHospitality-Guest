@@ -146,6 +146,11 @@ rec(
   Object.keys(checkoutBodies[1] || {}).every((k) => ["specialInstructions", "roomNumber"].includes(k)),
   JSON.stringify(Object.keys(checkoutBodies[1] || {})),
 );
+rec(
+  "specialInstructions is always a string",
+  typeof (checkoutBodies[1] || {}).specialInstructions === "string",
+  typeof (checkoutBodies[1] || {}).specialInstructions,
+);
 
 await page.screenshot({ path: "checkout-room.png" });
 await ctx.close();

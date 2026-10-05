@@ -156,6 +156,17 @@ rec(
   Object.keys(b1).every((k) => ["specialInstructions", "roomNumber", "scheduledAt"].includes(k)),
   JSON.stringify(Object.keys(b1)),
 );
+rec(
+  "scheduled body has all three curl keys",
+  Object.keys(b1).sort().join(",") === "roomNumber,scheduledAt,specialInstructions",
+  JSON.stringify(Object.keys(b1).sort()),
+);
+rec("specialInstructions is always a string", typeof b1.specialInstructions === "string", typeof b1.specialInstructions);
+rec(
+  "scheduledAt is ISO-8601 with Z",
+  typeof b1.scheduledAt === "string" && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(b1.scheduledAt),
+  String(b1.scheduledAt),
+);
 
 const statusText = (await page.locator("body").innerText()).toLowerCase();
 rec("confirmation page shows scheduled state", statusText.includes("order scheduled"), "");

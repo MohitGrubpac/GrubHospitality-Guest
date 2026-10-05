@@ -34,11 +34,20 @@ export function clearCart() {
   return apiClient.delete("/guest/cart");
 }
 
-/** POST /guest/cart/checkout - returns one order per kitchen */
+/**
+ * POST /guest/cart/checkout - returns one order per kitchen.
+ *
+ * Matches the documented contract exactly: `specialInstructions` is always a
+ * string (the deployed service 500s when the key is missing/undefined),
+ * `roomNumber` a string, and `scheduledAt` an ISO-8601 string only when the
+ * order is being scheduled.
+ */
 export function checkoutGuestCart({ specialInstructions, roomNumber, scheduledAt } = {}) {
+  const instructions = typeof specialInstructions === "string" ? specialInstructions.trim() : "";
+
   return apiClient.post("/guest/cart/checkout", {
-    ...(specialInstructions ? { specialInstructions } : {}),
     ...(roomNumber ? { roomNumber: String(roomNumber) } : {}),
+    specialInstructions: instructions,
     ...(scheduledAt ? { scheduledAt } : {}),
   });
 }

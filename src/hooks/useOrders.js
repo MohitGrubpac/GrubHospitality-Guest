@@ -158,7 +158,9 @@ export function useGuestOrder(orderId) {
         if (!cancelled) setState({ key, order: toActiveOrder(detail), loaded: true, error: null });
       })
       .catch((orderError) => {
-        if (!cancelled) setState({ key, ...EMPTY_ORDER, error: orderError });
+        // Mark loaded so callers stop showing a spinner and fall back to their
+        // static placeholder instead of spinning forever on a bad id.
+        if (!cancelled) setState({ key, ...EMPTY_ORDER, error: orderError, loaded: true });
       });
 
     return () => {

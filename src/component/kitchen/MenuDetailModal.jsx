@@ -9,12 +9,13 @@ import VegIndicator from "@/component/ui/VegIndicator";
 export default function MenuDetailModal({ item, onClose }) {
   if (!item) return null;
 
-  const { menuItemId, name, description, price, isVeg, image, isOutOfStock } = item;
+  const { menuItemId, name, description, price, isVeg, image, isOutOfStock, rating } = item;
   const tagChips =
     item.tagList ??
     (Array.isArray(item.tags)
       ? item.tags.map((tag) => (typeof tag === "string" ? { name: tag, icon: "" } : tag))
       : []);
+  const hasRating = Number(rating) > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
@@ -50,12 +51,9 @@ export default function MenuDetailModal({ item, onClose }) {
 
           {/* Item Details */}
           <div className="flex flex-col gap-[16px] p-[16px]">
-            <div className="flex items-center gap-[10px]">
-              <VegIndicator isVeg={isVeg} />
-              <h2 className="text-[24px] font-semibold text-[var(--gp-color-text-neutral-primary)] leading-[32px]">
-                {name}
-              </h2>
-            </div>
+            <h2 className="text-[24px] font-semibold text-[var(--gp-color-text-neutral-primary)] leading-[32px]">
+              {name}
+            </h2>
 
             {isOutOfStock && (
               <span className="self-start text-[12px] font-semibold uppercase tracking-wide text-[#b42318] bg-[#fee4e2] rounded px-[8px] py-[4px]">
@@ -63,10 +61,29 @@ export default function MenuDetailModal({ item, onClose }) {
               </span>
             )}
 
+            {/* Price, rating, veg and tags share the row with the ADD button */}
             <div className="flex items-center justify-between gap-3">
-              <span className="text-[18px] font-semibold text-[var(--gp-color-text-neutral-primary)]">
-                ₹{price}
-              </span>
+              <div className="flex items-center gap-3 flex-wrap min-w-0">
+                <span className="text-[18px] font-semibold text-[var(--gp-color-text-neutral-primary)]">
+                  ₹{price}
+                </span>
+                {hasRating && (
+                  <span className="flex items-center gap-[4px] shrink-0">
+                    <Image
+                      src="/restaurant/star.svg"
+                      alt="Rating"
+                      width={18}
+                      height={18}
+                      className="w-[18px] h-[18px] object-contain"
+                    />
+                    <span className="text-[15px] font-medium text-[var(--gp-color-text-neutral-primary)]">
+                      {rating}
+                    </span>
+                  </span>
+                )}
+                <VegIndicator isVeg={isVeg} />
+                <TagChips tags={tagChips} />
+              </div>
               <CartCounterButton
                 menuItemId={menuItemId}
                 disabled={isOutOfStock}
@@ -79,8 +96,7 @@ export default function MenuDetailModal({ item, onClose }) {
                 {description}
               </p>
             )}
-
-            {tagChips.length > 0 && <TagChips tags={tagChips} />}          </div>
+          </div>
         </div>
       </div>
     </div>

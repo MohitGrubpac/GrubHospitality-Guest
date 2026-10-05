@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useRef } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import content from "@/data/static-content.json";
@@ -8,21 +8,26 @@ import content from "@/data/static-content.json";
 import RatingFeedbackOrderCard from "@/component/profile/RatingFeedbackOrderCard";
 import ShareExperienceCard from "@/component/profile/ShareExperienceCard";
 import BillSummaryCard from "@/component/profile/BillSummaryCard";
-import { useGuestOrder } from "@/hooks/useOrders";
-import { useFeedback, writeFeedback } from "@/hooks/useFeedback";
+import { buildReorderEntries, useGuestOrder } from "@/hooks/useOrders";
+import { useFeedback } from "@/hooks/useFeedback";
+import { useCart } from "@/component/providers/CartProvider";
+import { showError } from "@/component/ui/Toast";
 
 /**
- * There is no ratings endpoint yet, so the submitted feedback is stored locally.
- * The order itself is real - fetched from GET /guest/orders/{orderId} - with a
- * static sample as the fallback when the order cannot be resolved.
+ * The order is real - fetched from GET /guest/orders/{orderId} - with a static
+ * sample as the fallback when it cannot be resolved. The form batch-rates the
+ * dishes into one POST /guest/feedback `items` array (falling back to flat
+ * per-dish calls if the deployed DTO rejects batches); the bottom button
+ * reorders the order back into the cart.
  */
 function RatingFeedbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
 
-  const shareExperienceRef = useRef(null);
   const savedFeedback = useFeedback(orderId);
+  const { reorderItems } = useCart();
+  const [isReordering, setIsReordering] = useState(false);
 
   const { order, isLoading } = useGuestOrder(orderId);
 
@@ -33,6 +38,7 @@ function RatingFeedbackContent() {
         time: order.placedAtLabel,
         status: order.statusLabel,
         items: order.items.map((line) => ({
+          id: line.menuItemId,
           name: line.name,
           qty: line.qty,
           isVeg: line.item?.isVeg,
@@ -45,17 +51,34 @@ function RatingFeedbackContent() {
     return fallback || content.reviewCopy?.fallbackOrder;
   }, [order, orderId]);
 
+  const feedbackTarget = useMemo(() => {
+    if (!order?.id || !order?.restaurantId) return null;
+    const items = (order.items || [])
+      .filter((line) => line.menuItemId)
+      .map((line) => ({ menuItemId: line.menuItemId, name: line.name }));
+    if (items.length === 0) return null;
+    return {
+      orderId: order.id,
+      restaurantId: order.restaurantId,
+      guestName: order.guestName,
+      items,
+    };
+  }, [order]);
+
   const submitted = Boolean(savedFeedback);
 
-  const handleSubmit = () => {
-    if (shareExperienceRef.current && !shareExperienceRef.current.submitted) {
-      shareExperienceRef.current.handleSubmit();
-
-      writeFeedback(orderId, {
-        overallRating: 5,
-        feedback: "Great food!",
-        time: new Date().toISOString(),
-      });
+  const handleReorder = async () => {
+    const entries = buildReorderEntries(order ? [order] : []);
+    if (entries.length === 0) {
+      showError("We couldn't find these dishes on the current menu.");
+      return;
+    }
+    setIsReordering(true);
+    try {
+      await reorderItems(entries);
+    } finally {
+      setIsReordering(false);
+      router.push("/cart");
     }
   };
 
@@ -124,7 +147,11 @@ function RatingFeedbackContent() {
               </div>
             </div>
           ) : (
-            <ShareExperienceCard ref={shareExperienceRef} order={sampleOrder} />
+            <ShareExperienceCard
+              order={sampleOrder}
+              orderId={orderId}
+              feedbackTarget={feedbackTarget}
+            />
           )}
 
           <BillSummaryCard amount={sampleOrder.totalAmount || 0} />
@@ -132,10 +159,11 @@ function RatingFeedbackContent() {
           <div className="w-full pt-2 pb-4">
             <button
               type="button"
-              onClick={submitted ? () => router.back() : handleSubmit}
-              className="w-full h-[48px] bg-[#FF4848] border border-[#FF3333] text-white rounded-lg text-[18px] leading-[24px] font-medium uppercase tracking-normal cursor-pointer shadow-xs active:bg-[#e03d06] transition-colors"
+              onClick={handleReorder}
+              disabled={isReordering}
+              className="w-full h-[48px] bg-[#FF4848] border border-[#FF3333] text-white rounded-lg text-[18px] leading-[24px] font-medium uppercase tracking-normal cursor-pointer shadow-xs active:bg-[#e03d06] transition-colors disabled:opacity-60"
             >
-              {submitted ? "done" : "submit"}
+              {isReordering ? "adding..." : "reorder"}
             </button>
           </div>
         </main>
