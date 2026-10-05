@@ -35,10 +35,11 @@ export function clearCart() {
 }
 
 /** POST /guest/cart/checkout - returns one order per kitchen */
-export function checkoutGuestCart({ specialInstructions, roomNumber } = {}) {
+export function checkoutGuestCart({ specialInstructions, roomNumber, scheduledAt } = {}) {
   return apiClient.post("/guest/cart/checkout", {
     ...(specialInstructions ? { specialInstructions } : {}),
     ...(roomNumber ? { roomNumber: String(roomNumber) } : {}),
+    ...(scheduledAt ? { scheduledAt } : {}),
   });
 }
 

@@ -8,6 +8,7 @@ import { useOrders } from "@/component/providers/OrdersProvider";
 import { useAuth } from "@/component/providers/AuthProvider";
 import { useRoom } from "@/component/providers/RoomProvider";
 import SwitchRoomModal from "@/component/ui/SwitchRoomModal";
+import ScheduleOrderModal from "@/component/ui/ScheduleOrderModal";
 import VegIndicator from "@/component/ui/VegIndicator";
 import { showError } from "@/component/ui/Toast";
 import { MAX_CART_QUANTITY } from "@/services/cartService";
@@ -126,13 +127,13 @@ function DeliveryDetails({ selectedRoom, onChangeRoom, isMultipleRooms, guest })
   );
 }
 
-function AddInstructionButton({ onClick, label = "Add Instruction" }) {
+function AddInstructionButton({ onClick, label = "Add Instruction", id = "add-instruction-btn" }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2 border border-[#fe480b] rounded-lg px-4 py-2 cursor-pointer hover:bg-red-50 transition-colors"
-      id="add-instruction-btn"
+      className="flex items-center gap-2 border border-[#fe480b] rounded-lg px-4 py-2 cursor-pointer hover:bg-red-50 transition-colors self-start"
+      id={id}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
@@ -152,6 +153,55 @@ function AddInstructionButton({ onClick, label = "Add Instruction" }) {
       </svg>
       <span className="text-xs font-semibold text-[#fe480b] uppercase tracking-wide">{label}</span>
     </button>
+  );
+}
+
+// One instruction field per kitchen: closed -> Add Instruction button (+ preview
+// of the already-entered note); open -> textarea with submit.
+function KitchenInstruction({ kitchenId, instruction, onOpen, onClose, onChangeText }) {
+  const open = instruction?.open || false;
+  const text = instruction?.text || "";
+
+  return (
+    <div className="px-5 pb-4 pt-3 border-t border-dashed border-[#e0e3e1]">
+      {open ? (
+        <div className="flex flex-col gap-2">
+          <textarea
+            value={text}
+            onChange={(event) => onChangeText(event.target.value)}
+            placeholder="Add special instructions for your order..."
+            rows={3}
+            maxLength={1000}
+            className="w-full border border-[#e0e3e1] rounded-lg px-3 py-2 text-base text-[#03130a] placeholder:text-[#b0b8b4] outline-none resize-none focus:border-[#fe480b] transition-colors"
+            id={`order-instruction-input-${kitchenId}`}
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-[#6b7971]">{text.length}/1000</span>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1.5 border border-[#fe480b] text-[#fe480b] rounded-lg px-4 py-2 text-xs font-bold uppercase cursor-pointer hover:bg-red-50 transition-colors"
+            >
+              Submit
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 18L15 12L9 6"
+                  stroke="#fe480b"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <AddInstructionButton onClick={onOpen} id={`add-instruction-btn-${kitchenId}`} />
+          {text.trim() && <p className="text-xs text-[#6b7971] leading-snug">{text}</p>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -198,7 +248,6 @@ export default function CartPage() {
     mutatingId,
     increment,
     removeItem,
-    clearCart,
     checkout,
     buildSpecialInstructions,
   } = useCart();
@@ -210,16 +259,42 @@ export default function CartPage() {
     isMultipleRooms,
   } = useRoom();
 
-  const [orderInstruction, setOrderInstruction] = useState("");
-  const [showInstruction, setShowInstruction] = useState(false);
+  const [instructions, setInstructions] = useState({});
   const [isRoomSwitchOpen, setIsRoomSwitchOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
 
   const isMultiKitchen = restaurantCount > 1;
 
-  const handlePlaceOrder = async () => {
+  const setInstructionOpen = (kitchenId, open) =>
+    setInstructions((prev) => ({
+      ...prev,
+      [kitchenId]: { ...(prev[kitchenId] || { open: false, text: "" }), open },
+    }));
+
+  const setInstructionText = (kitchenId, text) =>
+    setInstructions((prev) => ({
+      ...prev,
+      [kitchenId]: { ...(prev[kitchenId] || { open: false, text: "" }), text, open: true },
+    }));
+
+  const buildKitchenNotes = () =>
+    kitchens
+      .map((kitchen) => {
+        const text = (instructions[kitchen.restaurantId]?.text || "").trim();
+        if (!text) return null;
+        if (kitchens.length > 1) {
+          const name = kitchen.kitchenName?.trim() || "Kitchen";
+          return `${name}: ${text}`;
+        }
+        return text;
+      })
+      .filter(Boolean);
+
+  const handlePlaceOrder = async (scheduledAt = null) => {
     const created = await checkout({
-      specialInstructions: buildSpecialInstructions(orderInstruction),
+      specialInstructions: buildSpecialInstructions("", buildKitchenNotes()),
       roomNumber: selectedRoom,
+      scheduledAt,
     });
 
     if (!created || created.length === 0) return;
@@ -230,6 +305,13 @@ export default function CartPage() {
 
   const handleOrderNow = () => {
     handlePlaceOrder();
+  };
+
+  const handleScheduleConfirm = (schedule) => {
+    const [hours, minutes] = schedule.time.split(":").map(Number);
+    const when = new Date(schedule.date.dateObj);
+    when.setHours(hours, minutes, 0, 0);
+    handlePlaceOrder(when.toISOString());
   };
 
   if (isLoading && items.length === 0) {
@@ -302,17 +384,8 @@ export default function CartPage() {
 
         {/* Items Section */}
         <div className="mt-3 mx-4 bg-white rounded-2xl overflow-hidden">
-          <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+          <div className="px-5 pt-5 pb-3">
             <h2 className="text-sm font-bold text-[#03130a]">Items</h2>
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm("Remove all items from your cart?")) clearCart();
-              }}
-              className="text-[11px] font-semibold uppercase tracking-wide text-[#6b7971] cursor-pointer hover:text-[#fe480b] transition-colors"
-            >
-              Clear
-            </button>
           </div>
 
           {kitchens.map((kitchen) => (
@@ -379,51 +452,15 @@ export default function CartPage() {
                 );
               })}
 
-              <div className="px-5 py-3 border-t border-dashed border-[#e0e3e1] flex items-center justify-between">
-                <span className="text-xs text-[#6b7971]">Kitchen total</span>
-                <span className="text-sm font-bold text-[#03130a]">₹{kitchen.subtotal}</span>
-              </div>
+              <KitchenInstruction
+                kitchenId={kitchen.restaurantId}
+                instruction={instructions[kitchen.restaurantId]}
+                onOpen={() => setInstructionOpen(kitchen.restaurantId, true)}
+                onClose={() => setInstructionOpen(kitchen.restaurantId, false)}
+                onChangeText={(text) => setInstructionText(kitchen.restaurantId, text)}
+              />
             </div>
           ))}
-
-          {/* Order instructions */}
-          <div className="px-5 pb-4 pt-2 border-t border-dashed border-[#e0e3e1]">
-            {showInstruction ? (
-              <div className="flex flex-col gap-2">
-                <textarea
-                  value={orderInstruction}
-                  onChange={(event) => setOrderInstruction(event.target.value)}
-                  placeholder="Add special instructions for your order..."
-                  rows={3}
-                  maxLength={1000}
-                  className="w-full border border-[#e0e3e1] rounded-lg px-3 py-2 text-base text-[#03130a] placeholder:text-[#b0b8b4] outline-none resize-none focus:border-[#fe480b] transition-colors"
-                  id="order-instruction-input"
-                />
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#6b7971]">
-                    {orderInstruction.length}/1000
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowInstruction(false)}
-                    className="flex items-center gap-1.5 border border-[#fe480b] text-[#fe480b] rounded-lg px-4 py-2 text-xs font-bold uppercase cursor-pointer hover:bg-red-50 transition-colors"
-                  >
-                    Submit
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M9 18L15 12L9 6"
-                        stroke="#fe480b"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <AddInstructionButton onClick={() => setShowInstruction(true)} />
-            )}
-          </div>
         </div>
 
         {/* Bill Summary (scalloped ticket style) */}
@@ -444,21 +481,40 @@ export default function CartPage() {
 
       {/* Fixed bottom buttons */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] sm:max-w-[768px] bg-white border-t border-[#eff1f0] px-4 py-3 z-30">
-        <button
-          type="button"
-          onClick={handleOrderNow}
-          disabled={isMutating || !selectedRoom}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#fe480b] text-white rounded-xl text-xs font-bold uppercase tracking-wide cursor-pointer hover:bg-[#e4450a] transition-colors disabled:opacity-60"
-          id="order-now-btn"
-        >
-          {isMutating ? "Placing order..." : `Place order · ₹${subtotal}`}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsScheduleOpen(true)}
+            disabled={isMutating || !selectedRoom}
+            className="flex-1 py-3.5 border-2 border-[#fe480b] text-[#fe480b] rounded-xl text-xs font-bold uppercase tracking-wide cursor-pointer hover:bg-red-50 transition-colors disabled:opacity-60"
+            id="schedule-order-btn"
+          >
+            Schedule Order
+          </button>
+          <button
+            type="button"
+            onClick={handleOrderNow}
+            disabled={isMutating || !selectedRoom}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-[#fe480b] text-white rounded-xl text-xs font-bold uppercase tracking-wide cursor-pointer hover:bg-[#e4450a] transition-colors disabled:opacity-60"
+            id="order-now-btn"
+          >
+            {isMutating ? "Placing order..." : `Place order · ₹${subtotal}`}
+          </button>
+        </div>
         {!selectedRoom && (
           <p className="text-[11px] text-center text-[#b42318] mt-2">
             No room is linked to your reservation. Please contact the front desk.
           </p>
         )}
       </div>
+
+      {/* Schedule Modal */}
+      <ScheduleOrderModal
+        key={isScheduleOpen ? "schedule-open" : "schedule-closed"}
+        isOpen={isScheduleOpen}
+        onClose={() => setIsScheduleOpen(false)}
+        onSchedule={handleScheduleConfirm}
+      />
 
       {/* Switch Room Modal */}
       <SwitchRoomModal

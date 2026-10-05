@@ -86,9 +86,12 @@ export function toCartView(cart) {
 export function resolveSpecialInstructions({ orderInstruction, kitchenNotes, kitchens }) {
   if (orderInstruction && orderInstruction.trim()) return orderInstruction.trim();
 
-  const notes = (kitchenNotes || {})
-    .filter ? Object.values(kitchenNotes) : [];
-  const joined = notes
+  const source = Array.isArray(kitchenNotes)
+    ? kitchenNotes
+    : kitchenNotes && typeof kitchenNotes === "object"
+      ? Object.values(kitchenNotes)
+      : [];
+  const joined = source
     .filter((note) => typeof note === "string" && note.trim())
     .map((note) => note.trim())
     .join(" · ");
