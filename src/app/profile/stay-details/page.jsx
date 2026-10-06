@@ -7,7 +7,7 @@ import StayCard from "@/component/profile/StayCard";
 import { useRoom } from "@/component/providers/RoomProvider";
 import { useGuestOrders } from "@/hooks/useOrders";
 import { useAuth } from "@/component/providers/AuthProvider";
-import { buildStays, isOrderInStay } from "@/lib/adapters/stayAdapter";
+import { buildStays, isDeliveredOrder, isOrderInStay } from "@/lib/adapters/stayAdapter";
 
 /**
  * The API has no "stays" endpoint. The stay is the guest profile itself
@@ -41,9 +41,10 @@ export default function StayDetailsPage() {
 
   const embeddedOrders = guest?.orders ?? null;
 
-  // Only orders inside the stay window need their line items.
+  // Only delivered orders inside the stay window are listed, so only those are
+  // hydrated with their line items.
   const hydrateFilter = useCallback(
-    (row) => isOrderInStay(row, guest?.checkInAt, guest?.checkOutAt),
+    (row) => isOrderInStay(row, guest?.checkInAt, guest?.checkOutAt) && isDeliveredOrder(row),
     [guest?.checkInAt, guest?.checkOutAt],
   );
 

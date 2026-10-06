@@ -3,7 +3,11 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import VegIndicator from "@/component/ui/VegIndicator";
+import StarRating from "@/component/ui/StarRating";
+import { useOrderReview } from "@/hooks/useOrderReview";
+import { buildReorderEntries } from "@/hooks/useOrders";
+import { useCart } from "@/component/providers/CartProvider";
+import { showError } from "@/component/ui/Toast";
 
 const STATUS_TONE = {
   scheduled: "text-[#6B7971]",
@@ -14,9 +18,34 @@ const STATUS_TONE = {
 
 export default function StayOrderCard({ order }) {
   const router = useRouter();
+  const review = useOrderReview(order);
+  const { reorderItems } = useCart();
+  const [isReordering, setIsReordering] = useState(false);
+
   if (!order) return null;
 
   const items = order.items || [];
+  const orderRating = Math.round(review?.orderRating ?? review?.rating ?? 0);
+  const foodRating = Math.round(review?.foodRating ?? 0);
+  const hasRatings = orderRating > 0 || foodRating > 0;
+
+  const handleOrderAgain = async () => {
+    const entries = buildReorderEntries([order]);
+    if (entries.length === 0) {
+      showError("We couldn't find these dishes on the current menu.");
+      return;
+    }
+
+    setIsReordering(true);
+    try {
+      await reorderItems(entries);
+      router.push("/cart");
+    } catch {
+      router.push("/cart");
+    } finally {
+      setIsReordering(false);
+    }
+  };
 
   return (
     <div className="w-full bg-white rounded-lg p-4 shadow-2xs border border-[#E0E3E1] flex flex-col gap-3 my-1">
@@ -45,17 +74,13 @@ export default function StayOrderCard({ order }) {
           <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-4 h-4 rounded flex items-center justify-center shrink-0">
-                {item.isVeg === true || item.isVeg === false ? (
-                  <Image
-                    src={item.isVeg ? "/restaurant/veg_badge.svg" : "/restaurant/nonveg_badge.svg"}
-                    alt={item.isVeg ? "Veg" : "Non-Veg"}
-                    width={16}
-                    height={16}
-                    className="w-4 h-4 object-contain"
-                  />
-                ) : (
-                  <VegIndicator isVeg={null} />
-                )}
+                <Image
+                  src={item.isVeg ? "/restaurant/veg_badge.svg" : "/restaurant/nonveg_badge.svg"}
+                  alt={item.isVeg ? "Veg" : "Non-Veg"}
+                  width={16}
+                  height={16}
+                  className="w-4 h-4 object-contain"
+                />
               </div>
               <span className="text-[16px] leading-[24px] font-normal text-[#37493F] truncate">
                 {item.name}
@@ -110,22 +135,43 @@ export default function StayOrderCard({ order }) {
         </span>
       </div>
 
-      {/* Ratings are not exposed by the API, so no star rows are rendered here. */}
+      {/* Ratings the guest already gave this order, straight from the server. */}
+      {hasRatings && (
+        <>
+          <div className="w-full border-t border-[#E0E3E1]" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-[14px] leading-[20px] font-normal text-[#37493F]">
+                Order Rating
+              </span>
+              <StarRating value={orderRating} size={16} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[14px] leading-[20px] font-normal text-[#37493F]">
+                Food Rating
+              </span>
+              <StarRating value={foodRating} size={16} />
+            </div>
+          </div>
+        </>
+      )}
+
       <div className="flex flex-col items-center gap-3 pt-1">
         <button
           type="button"
           onClick={() => router.push("/profile/rating-feedback?orderId=" + order.id)}
           className="text-[16px] leading-[20px] font-medium text-[#FF3333] uppercase cursor-pointer"
         >
-          share feedback
+          {review ? "view feedback" : "share feedback"}
         </button>
 
         <button
           type="button"
-          onClick={() => router.push("/home/search")}
-          className="w-full h-[40px] bg-white border border-[#FF3333] text-[#FF3333] rounded-lg text-[16px] leading-[20px] font-medium uppercase cursor-pointer flex items-center justify-center shadow-xs"
+          onClick={handleOrderAgain}
+          disabled={isReordering}
+          className="w-full h-[40px] bg-white border border-[#FF3333] text-[#FF3333] rounded-lg text-[16px] leading-[20px] font-medium uppercase cursor-pointer flex items-center justify-center shadow-xs disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          order again
+          {isReordering ? "adding..." : "order again"}
         </button>
       </div>
     </div>

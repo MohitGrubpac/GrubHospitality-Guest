@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/component/providers/AuthProvider";
 import { useRoom } from "@/component/providers/RoomProvider";
 import { useOrders } from "@/component/providers/OrdersProvider";
+import { useCart } from "@/component/providers/CartProvider";
+import { buildReorderEntries } from "@/hooks/useOrders";
+import { showError } from "@/component/ui/Toast";
 import VegIndicator from "@/component/ui/VegIndicator";
 import { formatTime12 } from "@/lib/date";
 
@@ -84,6 +88,8 @@ export default function OrderStatusPage() {
   const { guest } = useAuth();
   const { selectedRoom } = useRoom();
   const { activeOrder, isLoading, hasActiveOrder } = useOrders();
+  const { reorderItems } = useCart();
+  const [isReordering, setIsReordering] = useState(false);
 
   if (isLoading && !activeOrder) {
     return (
@@ -105,6 +111,26 @@ export default function OrderStatusPage() {
       router.replace(`/kitchen/${activeOrder.kitchenSlug}`);
     } else {
       router.replace("/home");
+    }
+  };
+
+  // Finished orders land here from the cart - "Order Again" re-adds the same
+  // lines and opens the cart instead of sending the guest back to browse.
+  const handleOrderAgain = async () => {
+    const entries = buildReorderEntries([activeOrder]);
+    if (entries.length === 0) {
+      showError("We couldn't find these dishes on the current menu.");
+      return;
+    }
+
+    setIsReordering(true);
+    try {
+      await reorderItems(entries);
+      router.push("/cart");
+    } catch {
+      router.push("/cart");
+    } finally {
+      setIsReordering(false);
     }
   };
 
@@ -332,10 +358,11 @@ export default function OrderStatusPage() {
         <div className="absolute bottom-0 left-0 w-full bg-[#f7f8fa] px-4 py-3 flex flex-col gap-2 z-30">
           <button
             type="button"
-            onClick={() => router.replace("/home")}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#FF4B4B] text-white rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-600 transition-colors"
+            onClick={hasActiveOrder ? () => router.replace("/home") : handleOrderAgain}
+            disabled={isReordering}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#FF4B4B] text-white rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {hasActiveOrder ? "Back to Kitchens" : "Order Again"}
+            {hasActiveOrder ? "Back to Kitchens" : isReordering ? "adding..." : "Order Again"}
           </button>
         </div>
       </div>

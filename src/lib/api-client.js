@@ -3,6 +3,7 @@ import {
   clearTokens,
   getAccessToken,
   getRefreshToken,
+  getSessionGeneration,
   setTokens,
 } from "@/lib/token-store";
 
@@ -115,6 +116,7 @@ async function performRefresh() {
 
   refreshInFlight = (async () => {
     try {
+      const generation = getSessionGeneration();
       const response = await fetch(buildUrl("/guest-auth/refresh"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -136,6 +138,10 @@ async function performRefresh() {
 
       // 200 with an unusable shape: keep what we have instead of wiping it.
       if (!accessToken) return false;
+
+      // The session ended (logout) or was replaced while this refresh was in
+      // flight - storing the result would log the guest straight back in.
+      if (generation !== getSessionGeneration()) return false;
 
       setTokens({
         accessToken,

@@ -4,27 +4,24 @@ import { useState } from "react";
 import Image from "next/image";
 import { ApiError } from "@/lib/api-client";
 import { showError } from "@/component/ui/Toast";
-import {
-  isBatchRejected,
-  recordFeedback,
-  recordFeedbackFlat,
-} from "@/services/feedbackService";
-import { writeFeedback } from "@/hooks/useFeedback";
+import { recordFeedback } from "@/services/feedbackService";
+import { useAuth } from "@/component/providers/AuthProvider";
 
 /**
- * Rating + review form. Submit sends one POST /guest/feedback whose `items`
- * array holds a { menuItemId, rating, review } entry per rated dish (the
- * overall rating covers a single entry when no per-dish star was given). If
- * the deployed DTO rejects the batch (400 "property items should not exist"),
- * the same entries are replayed as flat per-dish calls so the feedback still
- * records; the submission is then mirrored locally for the history cards.
+ * Rating + review form. Submit sends one POST /guest/reviews carrying
+ * { orderId, orderRating, foodRating, comment, items } where `items` holds a
+ * { menuItemId, itemName, rating } entry per rated dish (every dish gets the
+ * overall star when only the overall rating was given). The profile is then
+ * re-read so every surface shows the review the server stored, and the payload
+ * is handed to `onSubmitted` so the screen can flip to its read-only view.
  */
-export default function ShareExperienceCard({ order, orderId, feedbackTarget }) {
+export default function ShareExperienceCard({ order, orderId, feedbackTarget, onSubmitted }) {
   const [overallRating, setOverallRating] = useState(0);
   const [itemRatings, setItemRatings] = useState({});
   const [feedback, setFeedback] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { refetchProfile } = useAuth();
 
   const items = order?.items || [
     { id: "i1", name: "Hyderabadi Biryani" },
@@ -43,65 +40,58 @@ export default function ShareExperienceCard({ order, orderId, feedbackTarget }) 
     if (!feedback.trim() && !hasRating) return;
 
     const review = feedback.trim();
-    const ratedItems = feedbackTarget
-      ? feedbackTarget.items
-          .map((item) => ({
-            menuItemId: item.menuItemId,
-            rating: itemRatings[item.menuItemId] || 0,
-          }))
-          .filter((entry) => entry.rating > 0)
-      : [];
+    const targetItems = feedbackTarget?.items?.filter((item) => item.menuItemId) || [];
+
+    const ratedItems = targetItems
+      .map((item) => ({
+        menuItemId: item.menuItemId,
+        itemName: item.name,
+        rating: itemRatings[item.menuItemId] || 0,
+      }))
+      .filter((entry) => entry.rating > 0);
 
     const items =
       ratedItems.length > 0
         ? ratedItems
-        : overallRating > 0 && feedbackTarget?.items?.length
-          ? feedbackTarget.items.map((item) => ({
+        : overallRating > 0
+          ? targetItems.map((item) => ({
               menuItemId: item.menuItemId,
+              itemName: item.name,
               rating: overallRating,
             }))
           : [];
 
-    const rating =
-      overallRating > 0
-        ? overallRating
-        : items.length > 0
-          ? Math.round(items.reduce((sum, entry) => sum + entry.rating, 0) / items.length)
-          : 0;
+    const foodRating = items.length
+      ? Math.round(items.reduce((sum, entry) => sum + entry.rating, 0) / items.length)
+      : 0;
+    const orderRating = overallRating > 0 ? overallRating : foodRating;
 
     const batch = {
-      restaurantId: feedbackTarget?.restaurantId,
       orderId: feedbackTarget?.orderId,
-      guestName: feedbackTarget?.guestName,
-      rating,
-      review,
+      orderRating,
+      foodRating: foodRating || orderRating,
+      comment: review,
       items,
     };
 
     setIsSubmitting(true);
     try {
-      if (rating > 0 && items.length > 0) {
-        try {
-          await recordFeedback(batch);
-        } catch (batchError) {
-          if (!isBatchRejected(batchError)) throw batchError;
-          await Promise.all(
-            items.map((entry) =>
-              recordFeedbackFlat({
-                restaurantId: batch.restaurantId,
-                orderId: batch.orderId,
-                menuItemId: entry.menuItemId,
-                guestName: batch.guestName,
-                rating: entry.rating,
-                review: batch.review,
-              }),
-            ),
-          );
-        }
+      if (orderRating > 0 && batch.orderId && items.length > 0) {
+        await recordFeedback(batch);
       }
-      writeFeedback(orderId, {
-        overallRating,
+      // Pull the fresh profile so the stay/history cards see the server's review.
+      refetchProfile().catch(() => {
+        /* the submitted view below does not depend on this */
+      });
+      onSubmitted?.({
+        overallRating: orderRating,
+        foodRating: batch.foodRating,
         feedback,
+        items: items.map((entry) => ({
+          menuItemId: entry.menuItemId,
+          name: entry.itemName,
+          rating: entry.rating,
+        })),
         time: new Date().toISOString(),
       });
       setSubmitted(true);

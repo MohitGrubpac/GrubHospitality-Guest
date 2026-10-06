@@ -30,7 +30,7 @@ export function formatDateLong(value) {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/** "20 May - 28 May 2026" / "30 May - 2 June 2026" */
+/** "1 May - 8 May 2026" (same year) / "30 December 2025 - 2 January 2026" */
 export function formatDateRange(startValue, endValue) {
   const start = toDate(startValue);
   const end = toDate(endValue);
@@ -38,12 +38,8 @@ export function formatDateRange(startValue, endValue) {
   if (!start) return formatDateLong(end);
   if (!end) return formatDateLong(start);
 
-  if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
-    return `${start.getDate()} - ${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`;
-  }
-
   if (start.getFullYear() === end.getFullYear()) {
-    return `${start.getDate()} ${SHORT_MONTHS[start.getMonth()]} - ${end.getDate()} ${SHORT_MONTHS[end.getMonth()]} ${end.getFullYear()}`;
+    return `${start.getDate()} ${MONTHS[start.getMonth()]} - ${end.getDate()} ${MONTHS[end.getMonth()]} ${end.getFullYear()}`;
   }
 
   return `${formatDateLong(start)} - ${formatDateLong(end)}`;

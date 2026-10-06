@@ -6,30 +6,35 @@ import Image from "next/image";
 import content from "@/data/static-content.json";
 
 import RatingFeedbackOrderCard from "@/component/profile/RatingFeedbackOrderCard";
+import StarRating from "@/component/ui/StarRating";
 import ShareExperienceCard from "@/component/profile/ShareExperienceCard";
 import BillSummaryCard from "@/component/profile/BillSummaryCard";
 import { buildReorderEntries, useGuestOrder } from "@/hooks/useOrders";
-import { useFeedback } from "@/hooks/useFeedback";
+import { useOrderReview } from "@/hooks/useOrderReview";
 import { useCart } from "@/component/providers/CartProvider";
 import { showError } from "@/component/ui/Toast";
 
 /**
  * The order is real - fetched from GET /guest/orders/{orderId} - with a static
- * sample as the fallback when it cannot be resolved. The form batch-rates the
- * dishes into one POST /guest/feedback `items` array (falling back to flat
- * per-dish calls if the deployed DTO rejects batches); the bottom button
- * reorders the order back into the cart.
+ * sample as the fallback when it cannot be resolved. The form posts one
+ * /guest/reviews body with { orderId, orderRating, foodRating, comment } plus
+ * the per-dish `items` ratings; the bottom button reorders the order back into
+ * the cart. The read-only "Your Rating" card renders the review the server
+ * embeds on the order (GET /guests/me) - nothing is mirrored in localStorage.
  */
 function RatingFeedbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
 
-  const savedFeedback = useFeedback(orderId);
   const { reorderItems } = useCart();
   const [isReordering, setIsReordering] = useState(false);
+  // Success payloads keyed by order id so switching orders shows the right state.
+  const [localSubmissions, setLocalSubmissions] = useState({});
 
   const { order, isLoading } = useGuestOrder(orderId);
+  const serverReview = useOrderReview(order || orderId);
+  const justSubmitted = orderId ? localSubmissions[orderId] : null;
 
   const sampleOrder = useMemo(() => {
     if (order) {
@@ -65,7 +70,25 @@ function RatingFeedbackContent() {
     };
   }, [order]);
 
-  const submitted = Boolean(savedFeedback);
+  // The just-posted payload renders right away; afterwards the review the server
+  // holds for this order is what the read-only card shows.
+  const displayFeedback = useMemo(() => {
+    if (justSubmitted) return justSubmitted;
+    if (!serverReview) return null;
+    return {
+      overallRating: serverReview.orderRating ?? serverReview.rating ?? 0,
+      foodRating: serverReview.foodRating ?? 0,
+      feedback: serverReview.comment || "",
+      items: [],
+    };
+  }, [justSubmitted, serverReview]);
+
+  const submitted = Boolean(displayFeedback);
+
+  const handleSubmitted = (payload) => {
+    if (!orderId) return;
+    setLocalSubmissions((previous) => ({ ...previous, [orderId]: payload }));
+  };
 
   const handleReorder = async () => {
     const entries = buildReorderEntries(order ? [order] : []);
@@ -120,29 +143,51 @@ function RatingFeedbackContent() {
                 Your Rating
               </h3>
               <div className="w-full border-t border-[#E0E3E1]" />
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Image
-                    key={star}
-                    src={
-                      star <= (savedFeedback?.overallRating || 5)
-                        ? "/profile/star_filled.svg"
-                        : "/profile/star_outline.svg"
-                    }
-                    alt={`Star ${star}`}
-                    width={20}
-                    height={20}
-                    className="w-5 h-5 object-contain"
-                  />
-                ))}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[14px] leading-[20px] font-normal text-[#37493F]">
+                  Order Rating
+                </span>
+                <StarRating value={displayFeedback?.overallRating || 5} size={20} />
               </div>
+
+              {displayFeedback?.foodRating > 0 && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[14px] leading-[20px] font-normal text-[#37493F]">
+                    Food Rating
+                  </span>
+                  <StarRating value={displayFeedback.foodRating} size={20} />
+                </div>
+              )}
+
+              {displayFeedback?.items?.length > 0 && (
+                <>
+                  <div className="w-full border-t border-[#E0E3E1]" />
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[14px] leading-[20px] font-semibold text-[#37493F]">
+                      Menu Ratings
+                    </span>
+                    {displayFeedback.items.map((item, index) => (
+                      <div
+                        key={item.menuItemId || index}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="text-[14px] leading-[20px] font-normal text-[#37493F] truncate">
+                          {item.name || "Menu item"}
+                        </span>
+                        <StarRating value={item.rating || 0} size={16} />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <div className="w-full border-t border-[#E0E3E1]" />
               <div className="flex flex-col gap-1">
                 <span className="text-[14px] leading-[20px] font-semibold text-[#37493F]">
                   Feedback
                 </span>
                 <p className="text-[14px] leading-[20px] text-[#6B7971]">
-                  {savedFeedback?.feedback || "Great food!"}
+                  {displayFeedback?.feedback || "Great food!"}
                 </p>
               </div>
             </div>
@@ -151,6 +196,7 @@ function RatingFeedbackContent() {
               order={sampleOrder}
               orderId={orderId}
               feedbackTarget={feedbackTarget}
+              onSubmitted={handleSubmitted}
             />
           )}
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/component/providers/CartProvider";
-import { useFeedbackSubmitted } from "@/hooks/useFeedback";
+import { useOrderReview } from "@/hooks/useOrderReview";
 import { showError } from "@/component/ui/Toast";
 
 export default function OrderHistoryItemCard({ order }) {
@@ -12,15 +12,16 @@ export default function OrderHistoryItemCard({ order }) {
   const { reorderItems } = useCart();
   const [isReordering, setIsReordering] = useState(false);
 
-  const feedbackSubmitted = useFeedbackSubmitted(order?.id);
+  const review = useOrderReview(order);
+  const feedbackSubmitted = Boolean(review);
 
   if (!order) return null;
 
   const isCanceled = order.isCancelled;
-  // No rating endpoint exists yet, so the star rows stay hidden.
-  const hasRatings = Boolean(order.orderRating || order.foodRating);
-  const orderRating = order.orderRating || 0;
-  const foodRating = order.foodRating || 0;
+  // Ratings the guest already gave this order, straight from the server.
+  const orderRating = Math.round(review?.orderRating ?? review?.rating ?? 0);
+  const foodRating = Math.round(review?.foodRating ?? 0);
+  const hasRatings = orderRating > 0 || foodRating > 0;
 
   const handleReorder = async () => {
     const entries = (order.items || [])

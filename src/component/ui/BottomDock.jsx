@@ -8,7 +8,7 @@ import { useCart } from "@/component/providers/CartProvider";
 import { useOrders } from "@/component/providers/OrdersProvider";
 
 /** Routes that own the bottom of the screen and must not get the dock. */
-const CART_HIDDEN_ROUTES = ["/", "/login", "/signup", "/room-selection", "/cart"];
+const CART_HIDDEN_ROUTES = ["/", "/login", "/signup", "/room-selection", "/cart", "/order-status"];
 const ORDER_HIDDEN_ROUTES = ["/", "/login", "/signup", "/room-selection", "/cart", "/order-status", "/active-orders"];
 
 const SWIPE_THRESHOLD = 50;

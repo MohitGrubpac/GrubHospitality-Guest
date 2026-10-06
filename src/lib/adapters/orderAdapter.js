@@ -149,6 +149,9 @@ export function toActiveOrder(order) {
     deliveredAt: order.deliveredAt || null,
     cancelledAt: order.cancelledAt || null,
     cancelReason: order.cancelReason || null,
+    // GET /guests/me embeds the submitted review on each order. Keep it attached
+    // so the stay/history cards can show ratings from the server, not local state.
+    review: order.review || null,
     version: order.version ?? null,
     statusHistory: (order.statusHistory || []).map((entry) => ({
       id: entry.id,
@@ -199,6 +202,7 @@ export function toHistoryOrder(row, detail = null) {
     placedAt: row.placedAt || detail?.placedAt || null,
     time: formatDateTimeShort(row.placedAt || detail?.placedAt),
     cancellationReason: detail?.cancelReason || null,
+    review: detail?.review || row.review || null,
     isCancelled: isCancelled(status),
     isDelivered: isDelivered(status),
     hasDetail: Boolean(detail),

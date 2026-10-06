@@ -1,5 +1,6 @@
 import { formatDateRange, formatDateTimeShort, toDate } from "@/lib/date";
 import { fromMinor } from "@/lib/money";
+import { enrichMenuItem } from "@/lib/menu-cache";
 
 /**
  * List rows from GET /guest/orders only carry `totalMinor`; the hydrated entries also
@@ -57,18 +58,38 @@ function toStayOrder(order) {
     placedAt: order.placedAt,
     status: order.statusLabel,
     statusTone: order.statusTone,
-    items: (order.items || []).map((line) => ({
-      name: line.name,
-      qty: line.qty,
-      isVeg: line.item?.isVeg ?? null,
-      price: line.price,
-    })),
+    // Profile-embedded orders carry raw API lines (`itemName`/`quantity`) while the
+    // hydrated history lines are already adapted (`name`/`qty`); reorder also needs
+    // the menu id, so keep one normalised line for both paths. The order APIs omit
+    // the veg flag, so it is enriched from the menu cache like the feedback screen.
+    items: (order.items || []).map((line) => {
+      const menuItemId = line.menuItemId || line.item?.menuItemId || line.item?.id || null;
+      const known = enrichMenuItem(menuItemId);
+      return {
+        menuItemId,
+        name: line.name || line.item?.name || line.itemName || "",
+        qty: line.qty || line.quantity || 1,
+        isVeg: line.isVeg ?? line.item?.isVeg ?? known.isVeg ?? null,
+        price: line.price,
+      };
+    }),
     moreCount: order.moreCount,
     totalAmount: order.totalAmount,
     totalMinor: order.totalMinor,
     currency: order.currency,
     itemCount: order.itemCount,
+    // Server-side review (orderRating / foodRating / comment) from GET /guests/me.
+    review: order.review || null,
   };
+}
+
+/**
+ * The stay screen is about what the guest actually received, so only completed
+ * (DELIVERED) orders are listed - in-flight, scheduled and cancelled ones stay
+ * on the tracker / history instead.
+ */
+export function isDeliveredOrder(order) {
+  return String(order?.status || "").toUpperCase() === "DELIVERED";
 }
 
 /**
@@ -76,18 +97,21 @@ function toStayOrder(order) {
  *
  * `rows` (the un-hydrated GET /guest/orders items) drives the count and spend so
  * this stays a single request, while `orders` (each hydrated with its line items)
- * only feeds the expandable list.
+ * only feeds the expandable list. Both are restricted to delivered orders so the
+ * summary always matches the list below it.
  */
 export function buildStays(guest, orders, rows) {
   if (!guest) return [];
 
   const status = stayStatusLabel(guest.checkInAt, guest.checkOutAt);
-  const stayOrders = filterOrdersToStay(orders, guest.checkInAt, guest.checkOutAt);
+  const stayOrders = filterOrdersToStay(orders, guest.checkInAt, guest.checkOutAt).filter(
+    isDeliveredOrder,
+  );
   const summaryRows = filterOrdersToStay(
     rows && rows.length > 0 ? rows : orders,
     guest.checkInAt,
     guest.checkOutAt,
-  );
+  ).filter(isDeliveredOrder);
 
   return [
     {

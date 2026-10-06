@@ -9,6 +9,18 @@ const cache = {
 
 const listeners = new Set();
 
+/**
+ * Bumped on every token write. A refresh that started before the session was
+ * ended (or replaced by a newer login) checks this before storing its result,
+ * so a slow response can never resurrect a logged-out session.
+ */
+let generation = 0;
+
+export function getSessionGeneration() {
+  hydrate();
+  return generation;
+}
+
 function emit() {
   listeners.forEach((listener) => listener());
 }
@@ -68,6 +80,7 @@ export function setTokens({ accessToken, refreshToken } = {}) {
     cache.refreshToken = refreshToken;
   }
   cache.hydrated = true;
+  generation += 1;
   persist();
 }
 
@@ -75,6 +88,7 @@ export function clearTokens() {
   cache.accessToken = null;
   cache.refreshToken = null;
   cache.hydrated = true;
+  generation += 1;
   persist();
 }
 

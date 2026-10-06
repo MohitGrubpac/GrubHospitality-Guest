@@ -1,44 +1,27 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { useAuth } from "@/component/providers/AuthProvider";
-
-const RoomContext = createContext(null);
-
-const STORAGE_PREFIX = "grubpac.selectedRoom.";
-
-function readStoredRoom(guestId) {
-  if (!guestId || typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(`${STORAGE_PREFIX}${guestId}`);
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredRoom(guestId, room) {
-  if (!guestId || typeof window === "undefined") return;
-  try {
-    if (room) window.localStorage.setItem(`${STORAGE_PREFIX}${guestId}`, room);
-    else window.localStorage.removeItem(`${STORAGE_PREFIX}${guestId}`);
-  } catch {
-    /* storage unavailable - the choice just will not survive a reload */
-  }
-}
+import { useCallback, useMemo } from "react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  clearSelectedRoom as clearSelectedRoomAction,
+  readStoredRoom,
+  setSelectedRoom as setSelectedRoomAction,
+} from "@/store/roomSlice";
 
 /**
  * Rooms are owned by the PMS and arrive on the profile as `stay.roomNumbers[]`.
- * Which one an order is delivered to is a device-local choice: PATCH /guests/me now
- * rejects `roomNumber` (its schema accepts `name` only), so the selection is kept in
- * localStorage and falls back to the first booked room.
+ * Which one an order is delivered to is a device-local choice kept in localStorage
+ * (PATCH /guests/me rejects `roomNumber`); the selection lives in `store/roomSlice`.
  */
-export function RoomProvider({ children }) {
-  const { guest } = useAuth();
+const EMPTY_ROOMS = [];
 
-  const guestId = guest?.id;
-  const bookedRooms = useMemo(() => guest?.roomNumbers || [], [guest?.roomNumbers]);
+export function useRoom() {
+  const dispatch = useAppDispatch();
+  const guestId = useAppSelector((state) => state.auth.guest?.id);
+  const roomNumbers = useAppSelector((state) => state.auth.guest?.roomNumbers);
+  const preferredRoom = useAppSelector((state) => state.room.preferredRoom);
 
-  const [preferredRoom, setPreferredRoom] = useState(null);
+  const bookedRooms = useMemo(() => roomNumbers || EMPTY_ROOMS, [roomNumbers]);
 
   // Validate the stored choice against the rooms the guest actually holds - the
   // reservation can change between visits.
@@ -53,24 +36,18 @@ export function RoomProvider({ children }) {
   }, [bookedRooms, preferredRoom, guestId]);
 
   const setSelectedRoom = useCallback(
-    (room) => {
-      if (!room || !bookedRooms.includes(room)) return false;
-      setPreferredRoom(room);
-      writeStoredRoom(guestId, room);
-      return true;
-    },
-    [bookedRooms, guestId],
+    (room) => dispatch(setSelectedRoomAction(room)),
+    [dispatch],
   );
-
-  const clearSelectedRoom = useCallback(() => {
-    setPreferredRoom(null);
-    writeStoredRoom(guestId, null);
-  }, [guestId]);
+  const clearSelectedRoom = useCallback(
+    () => dispatch(clearSelectedRoomAction()),
+    [dispatch],
+  );
 
   const isMultipleRooms = bookedRooms.length > 1;
   const hasStoredChoice = Boolean(readStoredRoom(guestId));
 
-  const value = useMemo(
+  return useMemo(
     () => ({
       selectedRoom,
       setSelectedRoom,
@@ -81,16 +58,13 @@ export function RoomProvider({ children }) {
       // True when the guest has a choice to make and has not made it yet.
       needsRoomSelection: isMultipleRooms && !hasStoredChoice,
     }),
-    [selectedRoom, setSelectedRoom, clearSelectedRoom, bookedRooms, isMultipleRooms, hasStoredChoice],
+    [
+      selectedRoom,
+      setSelectedRoom,
+      clearSelectedRoom,
+      bookedRooms,
+      isMultipleRooms,
+      hasStoredChoice,
+    ],
   );
-
-  return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;
-}
-
-export function useRoom() {
-  const context = useContext(RoomContext);
-  if (!context) {
-    throw new Error("useRoom must be used within a RoomProvider");
-  }
-  return context;
 }

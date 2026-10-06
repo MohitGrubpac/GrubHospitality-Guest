@@ -28,13 +28,36 @@ const order = (id) => ({
   placedAt: new Date(Date.now() - 86400000).toISOString(),
 });
 
+// An order the profile already carries a server-side review for. The detail
+// endpoint deliberately omits `review` - only GET /guests/me embeds it - so the
+// read-only view has to resolve through the profile, never through local state.
+const SERVER_ORDER = {
+  id: "ord-srv-1",
+  orderCode: "ODR-99",
+  restaurantId: "kitchen-one-1",
+  hotelName: "Hyatt Place — Airport",
+  guestId: GUEST.id,
+  guestName: "Aarav Mehta",
+  roomNumber: "1204",
+  items: [{ id: "oi-s1", menuItemId: "m-1", itemName: "Paneer Tikka", unitPriceMinor: 32000, quantity: 1, note: null }],
+  totalMinor: 60000,
+  currency: "INR",
+  placedAt: new Date(Date.now() - 86400000).toISOString(),
+  status: "DELIVERED",
+  review: {
+    id: "rev-srv",
+    rating: 4,
+    orderRating: 4,
+    foodRating: 3.67,
+    comment: "From the server",
+    createdAt: new Date().toISOString(),
+  },
+};
+
 let cartState = { kitchens: [], grandTotalMinor: 0, itemCount: 0 };
-const arrayAttempts = [];
-const arrayBodies = [];
-const feedbackBodies = [];
+const reviewBodies = [];
 const addBodies = [];
-let acceptsArray = false;
-let failFeedback = false;
+let failReviews = false;
 
 const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
@@ -45,56 +68,18 @@ await page.route(`${API}/**`, (route) => {
   const method = route.request().method();
   const auth = route.request().headers().authorization;
   const ok = (b, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(b) });
+  const dto400 = (message) =>
+    route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ success: false, statusCode: 400, message, error: "BAD_REQUEST" }),
+    });
 
   if (p === "/guest-auth/otp/request") return ok({ message: "sent" });
-  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: { ...GUEST, orders: [] } });
+  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: { ...GUEST, orders: [SERVER_ORDER] } });
   if (!auth) return route.fulfill({ status: 401, contentType: "application/json", body: "{}" });
-  if (p === "/guests/me") return ok({ ...GUEST, orders: [] });
+  if (p === "/guests/me") return ok({ ...GUEST, orders: [SERVER_ORDER] });
   if (p === "/guest/kitchens") return ok([]);
-  if (p === "/guest/feedback" && method === "POST") {
-    const body = JSON.parse(route.request().postData() || "{}");
-    const dto400 = (message) =>
-      route.fulfill({
-        status: 400,
-        contentType: "application/json",
-        body: JSON.stringify({ success: false, statusCode: 400, message, error: "BAD_REQUEST" }),
-      });
-
-    if (Array.isArray(body.items)) {
-      arrayAttempts.push(body);
-      const validBatch =
-        Object.keys(body).every((key) => ["guestName", "items", "orderId", "restaurantId"].includes(key)) &&
-        body.items.length >= 1 &&
-        body.items.length <= 50 &&
-        body.items.every(
-          (entry) =>
-            Object.keys(entry).every((key) => ["menuItemId", "rating", "review"].includes(key)) &&
-            Number.isInteger(entry.rating) &&
-            entry.rating >= 1 &&
-            entry.rating <= 5,
-        );
-      if (!validBatch) return dto400("items should be an array, rating must be an integer number");
-      // The live deployment currently validates the flat DTO instead.
-      if (!acceptsArray) {
-        return dto400("property items should not exist, rating must not be greater than 5, rating must not be less than 1, rating must be an integer number");
-      }
-      if (failFeedback) return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "feedback unavailable" }) });
-      arrayBodies.push(body);
-      return ok({ ok: true });
-    }
-
-    const validFlat =
-      Object.keys(body).every((key) =>
-        ["guestName", "menuItemId", "orderId", "rating", "restaurantId", "review"].includes(key),
-      ) &&
-      Number.isInteger(body.rating) &&
-      body.rating >= 1 &&
-      body.rating <= 5;
-    if (!validFlat) return dto400("property items should not exist, rating must be an integer number");
-    if (failFeedback) return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "feedback unavailable" }) });
-    feedbackBodies.push(body);
-    return ok({ ok: true });
-  }
   if (p === "/guest/cart" && method === "GET") return ok(cartState);
   if (p === "/guest/cart/items" && method === "POST") {
     const body = JSON.parse(route.request().postData() || "{}");
@@ -128,12 +113,36 @@ await page.route(`${API}/**`, (route) => {
     cartState.grandTotalMinor = kitchen.subtotalMinor;
     return ok(cartState);
   }
+  // POST /guest/reviews - the single batched feedback body the form sends.
+  if (p === "/guest/reviews" && method === "POST") {
+    const body = JSON.parse(route.request().postData() || "{}");
+    const validKeys = Object.keys(body).every((key) =>
+      ["comment", "foodRating", "items", "orderId", "orderRating"].includes(key),
+    );
+    const validItems =
+      Array.isArray(body.items) &&
+      body.items.length >= 1 &&
+      body.items.length <= 50 &&
+      body.items.every(
+        (entry) =>
+          Object.keys(entry).every((key) => ["itemName", "menuItemId", "rating"].includes(key)) &&
+          Number.isInteger(entry.rating) &&
+          entry.rating >= 1 &&
+          entry.rating <= 5,
+      );
+    if (!validKeys || !validItems) return dto400("invalid feedback body");
+    if (failReviews) {
+      return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "reviews unavailable" }) });
+    }
+    reviewBodies.push(body);
+    return ok({ ok: true });
+  }
   if (p.startsWith("/guest/orders/")) {
     const id = p.slice("/guest/orders/".length);
     if (id === "ord-missing") return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
     return ok(order(id));
   }
-  if (p === "/guest/orders") return ok([order("ord-fb-1")]);
+  if (p === "/guest/orders") return ok([]);
   return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
 });
 await page.addInitScript(() => {
@@ -160,12 +169,13 @@ if (page.url().includes("/room-selection")) {
 }
 await page.waitForURL("**/home", { timeout: 20000 });
 
-// ---- Scenario 1: per-dish POST to /feedback, then reorder
+const bodyText = () => page.locator("body").innerText();
+
+// ---- Scenario 1: per-dish ratings -> one POST /guest/reviews, then reorder
 await page.goto(`${BASE}/profile/rating-feedback?orderId=ord-fb-1`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector('textarea[placeholder="Loved the meal..."]', { timeout: 20000 });
 rec("form visible for real order", await page.locator('textarea[placeholder="Loved the meal..."]').isVisible());
 
-const bodyText = () => page.locator("body").innerText();
 const preSubmit = (await bodyText()).toLowerCase();
 rec("form shows not-yet-rated view", !preSubmit.includes("your rating"), "");
 
@@ -177,47 +187,38 @@ const bottomBtn = page.locator('main button').last();
 const bottomText = (await bottomBtn.innerText()).trim().toLowerCase();
 rec("bottom button reads reorder", bottomText === "reorder", bottomText);
 
-// rate both dishes (5 and 3 stars, overall left at 0) -> batch array first;
-// the mock deployment rejects it, so the flat per-dish fallback must land.
+// rate both dishes (5 and 3 stars, overall left at 0) + a comment
 await starBtns.nth(9).click();
 await starBtns.nth(12).click();
 await page.fill('textarea[placeholder="Loved the meal..."]', "Tasty!");
 await page.locator('button[aria-label="Submit feedback"]').click();
 await page.waitForSelector('h3:has-text("Your Rating")', { timeout: 15000 });
 
-rec("batch array sent first", arrayAttempts.length === 1, `attempts=${arrayAttempts.length}`);
-const a1 = arrayAttempts[0] || {};
+rec("one batched POST /guest/reviews", reviewBodies.length === 1, `posts=${reviewBodies.length}`);
+const r1 = reviewBodies[0] || {};
 rec(
-  "array body keys exact",
-  Object.keys(a1).sort().join(",") === "guestName,items,orderId,restaurantId",
-  JSON.stringify(Object.keys(a1)),
+  "body keys exact",
+  Object.keys(r1).sort().join(",") === "comment,foodRating,items,orderId,orderRating",
+  JSON.stringify(Object.keys(r1)),
 );
-rec("array carries order + restaurant", a1.orderId === "ord-fb-1" && a1.restaurantId === "kitchen-one-1", `${a1.orderId}/${a1.restaurantId}`);
-rec("array carries guest", a1.guestName === "Aarav Mehta", String(a1.guestName));
-rec("array items holds both dishes", Array.isArray(a1.items) && a1.items.length === 2, JSON.stringify(a1.items));
-const itemKeysOk = (a1.items || []).every(
-  (it) => Object.keys(it).sort().join(",") === "menuItemId,rating,review",
-);
-rec("array item keys exact", itemKeysOk, JSON.stringify((a1.items || []).map((it) => Object.keys(it))));
+rec("body carries the order", r1.orderId === "ord-fb-1", String(r1.orderId));
 rec(
-  "array ratings match the stars",
-  a1.items?.[0]?.menuItemId === "m-1" &&
-    a1.items?.[0]?.rating === 5 &&
-    a1.items?.[1]?.menuItemId === "m-2" &&
-    a1.items?.[1]?.rating === 3,
-  JSON.stringify(a1.items),
+  "derived ratings from the stars",
+  r1.orderRating === 4 && r1.foodRating === 4,
+  `${r1.orderRating}/${r1.foodRating}`,
 );
-rec("shared review in array", (a1.items || []).every((it) => it.review === "Tasty!"), JSON.stringify((a1.items || []).map((it) => it.review)));
-rec("rejected array falls back to flat", feedbackBodies.length === 2, `flat=${feedbackBodies.length}`);
-const f1 = feedbackBodies[0] || {};
-const f2 = feedbackBodies[1] || {};
+rec("comment posted", r1.comment === "Tasty!", r1.comment);
 rec(
-  "fallback body keys exact",
-  Object.keys(f1).sort().join(",") === "guestName,menuItemId,orderId,rating,restaurantId,review",
-  JSON.stringify(Object.keys(f1)),
+  "items hold both dishes with their own stars",
+  Array.isArray(r1.items) &&
+    r1.items.length === 2 &&
+    r1.items[0]?.menuItemId === "m-1" &&
+    r1.items[0]?.rating === 5 &&
+    r1.items[0]?.itemName === "Paneer Tikka" &&
+    r1.items[1]?.menuItemId === "m-2" &&
+    r1.items[1]?.rating === 3,
+  JSON.stringify(r1.items),
 );
-rec("fallback covers both dishes", f1.menuItemId === "m-1" && f1.rating === 5 && f2.menuItemId === "m-2" && f2.rating === 3, `${f1.menuItemId}/${f1.rating} + ${f2.menuItemId}/${f2.rating}`);
-rec("fallback keeps guest + review", f1.guestName === "Aarav Mehta" && f1.review === "Tasty!", `${f1.guestName}/${f1.review}`);
 
 // bottom button is still REORDER after submit
 const postBtnText = (await page.locator('main button').last().innerText()).trim().toLowerCase();
@@ -235,8 +236,7 @@ rec(
 const cartText = (await bodyText()).toLowerCase();
 rec("cart shows reordered dish", cartText.includes("paneer tikka"), "");
 
-// ---- Scenario 2: overall-only -> single-entry array, this deployment accepts it
-acceptsArray = true;
+// ---- Scenario 2: overall-only rating -> every dish inherits it
 await page.goto(`${BASE}/profile/rating-feedback?orderId=ord-fb-2`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector('textarea[placeholder="Loved the meal..."]', { timeout: 20000 });
 const stars2 = page.locator('button:has(img[alt="Star"])');
@@ -245,39 +245,31 @@ await page.fill('textarea[placeholder="Loved the meal..."]', "Nice stay dinner")
 await page.locator('button[aria-label="Submit feedback"]').click();
 await page.waitForSelector('h3:has-text("Your Rating")', { timeout: 15000 });
 
-rec("overall submits as array batch", arrayAttempts.length === 2 && arrayBodies.length === 1, `attempts=${arrayAttempts.length} accepted=${arrayBodies.length}`);
-const a2 = arrayBodies[0] || {};
-rec(
-  "overall array keys exact",
-  Object.keys(a2).sort().join(",") === "guestName,items,orderId,restaurantId",
-  JSON.stringify(Object.keys(a2)),
-);
-rec("overall array is single item", Array.isArray(a2.items) && a2.items.length === 1, JSON.stringify(a2.items));
-rec("overall uses first dish id", a2.items?.[0]?.menuItemId === "m-1", String(a2.items?.[0]?.menuItemId));
-rec("overall uses overall rating", a2.items?.[0]?.rating === 4, String(a2.items?.[0]?.rating));
-rec("accepted array skips flat calls", feedbackBodies.length === 2, `flat=${feedbackBodies.length}`);
+rec("second submit posts the batch", reviewBodies.length === 2, `posts=${reviewBodies.length}`);
+const r2 = reviewBodies[1] || {};
+rec("overall rating lands on the order", r2.orderId === "ord-fb-2" && r2.orderRating === 4 && r2.foodRating === 4, `${r2.orderRating}/${r2.foodRating}`);
+rec("overall rating copied to both dishes", Array.isArray(r2.items) && r2.items.length === 2 && r2.items.every((it) => it.rating === 4), JSON.stringify(r2.items));
 
 // ---- Scenario 3: failed POST keeps the form, retry succeeds
 await page.goto(`${BASE}/profile/rating-feedback?orderId=ord-fb-3`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector('textarea[placeholder="Loved the meal..."]', { timeout: 20000 });
 const stars3 = page.locator('button:has(img[alt="Star"])');
-failFeedback = true;
+failReviews = true;
 await stars3.nth(9).click();
 await page.locator('button[aria-label="Submit feedback"]').click();
 await page.waitForTimeout(1200);
 const afterFail = (await bodyText()).toLowerCase();
 rec("failed submit keeps the form", afterFail.includes("drop a feedback"), "");
 rec("failed submit does not record", !afterFail.includes("your rating"), "");
-rec("failed attempt still went as array", arrayAttempts.length === 3, `attempts=${arrayAttempts.length}`);
-rec("server error does not trigger flat fallback", feedbackBodies.length === 2, `flat=${feedbackBodies.length}`);
+rec("server error records nothing", reviewBodies.length === 2, `posts=${reviewBodies.length}`);
 
-failFeedback = false;
+failReviews = false;
 await page.locator('button[aria-label="Submit feedback"]').click();
 await page.waitForSelector('h3:has-text("Your Rating")', { timeout: 15000 });
-rec("retry posts the array", arrayAttempts.length === 4 && arrayBodies.length === 2, `attempts=${arrayAttempts.length} accepted=${arrayBodies.length}`);
-rec("retry records locally", (await page.locator("body").innerText()).toLowerCase().includes("your rating"), "");
+rec("retry posts the batch", reviewBodies.length === 3, `posts=${reviewBodies.length}`);
+rec("retry flips to the submitted view", (await bodyText()).toLowerCase().includes("your rating"), "");
 
-// ---- Scenario 4: unresolved order -> local-only, reorder blocked
+// ---- Scenario 4: unresolved order -> no request, reorder blocked
 await page.goto(`${BASE}/profile/rating-feedback?orderId=ord-missing`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector('textarea[placeholder="Loved the meal..."]', { timeout: 20000 });
 const stars4 = page.locator('button:has(img[alt="Star"])');
@@ -286,10 +278,9 @@ await page.locator('button[aria-label="Submit feedback"]').click();
 await page.waitForSelector('h3:has-text("Your Rating")', { timeout: 15000 });
 rec(
   "unresolved order sends no request",
-  arrayAttempts.length === 4 && feedbackBodies.length === 2,
-  `attempts=${arrayAttempts.length} flat=${feedbackBodies.length}`,
+  reviewBodies.length === 3,
+  `posts=${reviewBodies.length}`,
 );
-rec("fallback order still records locally", true, "");
 
 const urlBefore = page.url();
 await page.locator('main button:has-text("reorder")').click();
@@ -297,6 +288,19 @@ await page.waitForTimeout(1000);
 rec("blocked reorder stays on page", page.url() === urlBefore, page.url());
 const blockedText = (await bodyText()).toLowerCase();
 rec("blocked reorder shows error", blockedText.includes("couldn't find these dishes"), "");
+
+// ---- Scenario 5: review embedded in GET /guests/me opens the read-only view
+await page.goto(`${BASE}/profile/rating-feedback?orderId=ord-srv-1`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector('h3:has-text("Your Rating")', { timeout: 20000 });
+const srvText = (await bodyText()).toLowerCase();
+rec(
+  "embedded review opens the submitted view with no new POST",
+  reviewBodies.length === 3,
+  `posts=${reviewBodies.length}`,
+);
+rec("submitted view shows the server comment", srvText.includes("from the server"), "");
+rec("submitted view shows the order rating row", srvText.includes("order rating"), "");
+rec("no form offered for an already-rated order", !srvText.includes("drop a feedback"), "");
 
 await page.screenshot({ path: "feedback-reorder.png" });
 await ctx.close();

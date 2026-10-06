@@ -5,7 +5,13 @@ import { useAuth, AUTH_STATUS } from "@/component/providers/AuthProvider";
 import { ApiError } from "@/lib/api-client";
 import { enrichMenuItem } from "@/lib/menu-cache";
 import { toActiveOrder, toHistoryOrder } from "@/lib/adapters/orderAdapter";
+import { cachedRequest } from "@/lib/request-cache";
 import * as orderService from "@/services/orderService";
+
+// Screens refetch on every mount (tab switches, back navigation, several cards
+// mounting together); these TTLs collapse that into one network call.
+const LIST_TTL_MS = 30000;
+const DETAIL_TTL_MS = 15000;
 
 const EMPTY_LIST = {
   rows: [],
@@ -56,40 +62,50 @@ export function useGuestOrders({
   const view = selectByKey(state, key);
 
   // Pure fetch: returns the payload, commits nothing. Shared by the effect and refetch.
-  const fetchOrders = useCallback(async () => {
-    const response = await orderService.listGuestOrders({ status: statusFilter });
+  const fetchOrders = useCallback(
+    async ({ force = false } = {}) => {
+      const response = await cachedRequest(
+        `orders:list:${statusFilter || "all"}`,
+        () => orderService.listGuestOrders({ status: statusFilter }),
+        { ttlMs: LIST_TTL_MS, force },
+      );
 
-    const rows = response?.items || [];
-    const total = response?.total ?? rows.length;
+      const rows = response?.items || [];
+      const total = response?.total ?? rows.length;
 
-    const shouldHydrate = (row) => {
-      if (!hydrate) return false;
-      const filter = filterRef.current;
-      return filter ? Boolean(filter(row)) : true;
-    };
+      const shouldHydrate = (row) => {
+        if (!hydrate) return false;
+        const filter = filterRef.current;
+        return filter ? Boolean(filter(row)) : true;
+      };
 
-    const details = await Promise.all(
-      rows.filter(shouldHydrate).map((row) =>
-        orderService
-          .getGuestOrder(row.id)
-          .then((detail) => toHistoryOrder(row, detail))
-          .catch(() => toHistoryOrder(row)),
-      ),
-    );
+      const details = await Promise.all(
+        rows.filter(shouldHydrate).map((row) =>
+          cachedRequest(
+            `orders:detail:${row.id}`,
+            () => orderService.getGuestOrder(row.id),
+            { ttlMs: DETAIL_TTL_MS, force },
+          )
+            .then((detail) => toHistoryOrder(row, detail))
+            .catch(() => toHistoryOrder(row)),
+        ),
+      );
 
-    // Un-hydrated rows still count toward totals, just without line items.
-    const hydrated = new Set(details.map((order) => order.id));
-    const summaryOnly = rows
-      .filter((row) => !hydrated.has(row.id))
-      .map((row) => toHistoryOrder(row));
+      // Un-hydrated rows still count toward totals, just without line items.
+      const hydrated = new Set(details.map((order) => order.id));
+      const summaryOnly = rows
+        .filter((row) => !hydrated.has(row.id))
+        .map((row) => toHistoryOrder(row));
 
-    return {
-      rows,
-      orders: [...details, ...summaryOnly].filter(Boolean),
-      total,
-      isTruncated: total > rows.length,
-    };
-  }, [statusFilter, hydrate]);
+      return {
+        rows,
+        orders: [...details, ...summaryOnly].filter(Boolean),
+        total,
+        isTruncated: total > rows.length,
+      };
+    },
+    [statusFilter, hydrate],
+  );
 
   useEffect(() => {
     if (!isActive) return undefined;
@@ -118,7 +134,7 @@ export function useGuestOrders({
   const refetch = useCallback(async () => {
     if (!isActive) return [];
     try {
-      const payload = await fetchOrders();
+      const payload = await fetchOrders({ force: true });
       setState({ key, ...payload, loaded: true, error: null });
       return payload.orders;
     } catch (ordersError) {
@@ -152,8 +168,11 @@ export function useGuestOrder(orderId) {
 
     let cancelled = false;
 
-    orderService
-      .getGuestOrder(orderId)
+    cachedRequest(
+      `orders:detail:${orderId}`,
+      () => orderService.getGuestOrder(orderId),
+      { ttlMs: DETAIL_TTL_MS },
+    )
       .then((detail) => {
         if (!cancelled) setState({ key, order: toActiveOrder(detail), loaded: true, error: null });
       })

@@ -1,22 +1,16 @@
 "use client";
 
+import { Provider } from "react-redux";
 import ToastProvider from "../ui/ToastProvider";
-import { AuthProvider } from "./AuthProvider";
-import { CartProvider } from "./CartProvider";
-import { OrdersProvider } from "./OrdersProvider";
-import { RoomProvider } from "./RoomProvider";
+import { store } from "@/store";
+import StoreEffects from "@/store/effects";
 
 export default function MainProvider({ children }) {
   return (
-    <>
+    <Provider store={store}>
       <ToastProvider />
-      <AuthProvider>
-        <RoomProvider>
-          <CartProvider>
-            <OrdersProvider>{children}</OrdersProvider>
-          </CartProvider>
-        </RoomProvider>
-      </AuthProvider>
-    </>
+      <StoreEffects />
+      {children}
+    </Provider>
   );
 }
