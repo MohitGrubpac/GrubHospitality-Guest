@@ -89,12 +89,20 @@ await page.waitForURL("**/home", { timeout: 20000 });
 
 // Tracked order adopted on /home; open the status screen
 await page.goto(`${BASE}/order-status`, { waitUntil: "domcontentloaded" });
-await page.waitForSelector("text=Order Confirmed!", { timeout: 20000 });
+await page.waitForSelector("text=Order Placed!", { timeout: 20000 });
 
 const initialHits = orderDetailHits;
 const initialDone = await doneCount();
-rec("placed order renders as backend status NEW", initialDone === 1, `doneChecks=${initialDone}`);
-rec("timeline shows exactly the accepted step done", (await page.locator("text=Order Accepted").count()) >= 1);
+rec("placed order renders as backend status NEW", initialDone === 0, `doneChecks=${initialDone}`);
+rec("timeline shows the accepted step still pending", (await page.locator("text=Order Accepted").count()) >= 1);
+rec(
+  "placed screen waits for kitchen acceptance",
+  (await page.locator("text=Waiting for the kitchen to accept").count()) >= 1,
+);
+
+const telLinks = await page.locator('a[href^="tel:"]').count();
+rec("placed screen offers Call Reception", telLinks >= 1, `tel=${telLinks}`);
+rec("placed screen offers Cancel Order", (await page.locator("#page-cancel-order").count()) === 1);
 
 // Wait through at least one full 20s poll cycle while backend still reports NEW
 const pollDeadline = Date.now() + 26000;
@@ -108,8 +116,26 @@ rec("order is polled from the backend (>=1 refetch)", polled, `hits ${initialHit
 await page.waitForTimeout(1500);
 const afterPollDone = await doneCount();
 const afterPollText = await page.locator("body").innerText();
-rec("frontend does NOT auto-advance status between polls", afterPollDone === 1 && afterPollText.includes("Order Confirmed!"), `doneChecks=${afterPollDone}`);
+rec(
+  "frontend does NOT auto-advance status between polls",
+  afterPollDone === 0 && afterPollText.includes("Order Placed!"),
+  `doneChecks=${afterPollDone}`,
+);
 rec("frontend never writes to the orders API", orderWriteHits === 0, `writes=${orderWriteHits}`);
+
+// Kitchen acceptance signalled via acceptedAt while still NEW -> Order Confirmed
+ORDER.acceptedAt = new Date().toISOString();
+let confirmed = false;
+try {
+  await page.waitForSelector("text=Order Confirmed!", { timeout: 26000 });
+  confirmed = true;
+} catch {
+  confirmed = false;
+}
+rec("acceptedAt flips the headline to Order Confirmed", confirmed);
+await page.waitForTimeout(600);
+const acceptedDone = await doneCount();
+rec("accepted step completes once the kitchen accepts", acceptedDone === 1, `doneChecks=${acceptedDone}`);
 
 // Backend now reports PREPARING -> next poll must reflect it (real-time, server-driven)
 backendStatus = "PREPARING";
@@ -124,6 +150,9 @@ try {
   advanced = false;
 }
 rec("status updates only after backend updates (PREPARING picked up)", advanced);
+
+const cancelLeft = await page.locator("#page-cancel-order").count();
+rec("cancel button disappears once the kitchen is preparing", cancelLeft === 0, `count=${cancelLeft}`);
 
 await ctx.close();
 await browser.close();

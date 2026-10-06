@@ -111,9 +111,9 @@ rec("delivered/cancelled orders are never fetched", terminalFetched.length === 0
 
 // ---- Status screen is confirmation-only: no inline order list ----
 await page.goto(`${BASE}/order-status`, { waitUntil: "domcontentloaded" });
-await page.waitForSelector("text=Order Confirmed!", { timeout: 20000 });
+await page.waitForSelector("text=Order Placed!", { timeout: 20000 });
 
-const defaultShown = await page.locator("text=Order GUEST-DEMO-1").count();
+const defaultShown = await page.locator("text=Order ID #GUEST-DEMO-1").count();
 rec("newest active order shown by default", defaultShown >= 1, `hits=${defaultShown}`);
 
 const rows = await page.locator('button[aria-pressed]:has-text("GUEST-DEMO")').count();
@@ -141,11 +141,11 @@ rec("all active orders page lists every active order", cardCount === ACTIVE.leng
 
 const pageCopy = await page.locator("body").innerText();
 rec("cards show server-driven statuses",
-  pageCopy.includes("Accepted") && pageCopy.includes("Preparing") && pageCopy.includes("Ready"));
+  pageCopy.includes("Placed") && pageCopy.includes("Preparing") && pageCopy.includes("Ready"));
 
 await cardButtons.nth(1).click();
 await page.waitForURL("**/order-status", { timeout: 10000 });
-await page.waitForSelector("text=Order GUEST-DEMO-2", { timeout: 10000 });
+await page.waitForSelector("text=Order ID #GUEST-DEMO-2", { timeout: 10000 });
 rec("card VIEW DETAILS opens that order's confirmation page", true);
 
 rec("frontend never writes to the orders API", orderWrites === 0, `writes=${orderWrites}`);

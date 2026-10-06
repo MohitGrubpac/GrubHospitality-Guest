@@ -116,6 +116,17 @@ function toTag(tag) {
   return { name: String(tag), icon: "" };
 }
 
+/**
+ * Backend averages arrive unrounded (3.33333333333333); render at most one
+ * decimal so every card shows a clean number. null/invalid stays null.
+ */
+function toDisplayRating(value) {
+  if (value === null || value === undefined) return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.round(numeric * 10) / 10;
+}
+
 /** API menu item -> the item shape every dish/menu component renders. */
 export function toMenuItem(item, kitchen) {
   if (!item) return null;
@@ -130,7 +141,7 @@ export function toMenuItem(item, kitchen) {
     description: item.description || "",
     price: fromMinor(priceMinor),
     priceMinor,
-    rating: item.rating ?? null,
+    rating: toDisplayRating(item.rating),
     isVeg: item.isVeg !== false,
     isOutOfStock: Boolean(item.isOutOfStock),
     image: item.image || null,

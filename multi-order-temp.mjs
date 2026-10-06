@@ -121,7 +121,7 @@ await page.waitForSelector("text=Our Restaurants", { timeout: 20000 });
 // ---- Phase 1: confirmation page shows the in-flight order, no inline list ----
 await page.goto(`${BASE}/order-status`, { waitUntil: "domcontentloaded" });
 try {
-  await page.waitForSelector("text=Order Confirmed!", { timeout: 20000 });
+  await page.waitForSelector("text=Order Placed!", { timeout: 20000 });
 } catch (error) {
   console.log("== /order-status body on failure ==\n" + (await page.locator("body").innerText()));
   console.log("url =", page.url(), "tracked =", await trackedIds());
@@ -130,7 +130,7 @@ try {
 
 const rows = await page.locator('button[aria-pressed]:has-text("GH-100")').count();
 rec("confirmation page has no inline order list", rows === 0, `rows=${rows}`);
-const defaultCode = await page.locator("text=Order GH-1001").count();
+const defaultCode = await page.locator("text=Order ID #GH-1001").count();
 rec("shows the in-flight order by default", defaultCode >= 1, `hits=${defaultCode}`);
 
 // ---- Phase 2: dock panel visible with an in-flight order ----

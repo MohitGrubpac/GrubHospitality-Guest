@@ -40,6 +40,10 @@ rec("rating passes through (number)",
   toMenuItem({ id: "m6", name: "Chai", priceMinor: 100, rating: 3.5 }).rating === 3.5);
 rec("rating null stays null",
   toMenuItem({ id: "m7", name: "Chai", priceMinor: 100, rating: null }).rating === null);
+rec("long-float rating truncates to one decimal",
+  toMenuItem({ id: "m8", name: "Chai", priceMinor: 100, rating: 3.33333333333333 }).rating === 3.3);
+rec("integer rating stays an integer",
+  toMenuItem({ id: "m9", name: "Chai", priceMinor: 100, rating: 5 }).rating === 5);
 
 const failed = results.filter((p) => !p).length;
 console.log(`\n======== ${results.length - failed}/${results.length} passed ========`);

@@ -32,3 +32,16 @@ export function listGuestOrders({ status } = {}) {
 export function getGuestOrder(orderId) {
   return apiClient.get(`/guest/orders/${encodeURIComponent(orderId)}`);
 }
+
+/**
+ * POST /guest/orders/{orderId}/cancel - guest-initiated cancellation.
+ * `reason` is required free text (trimmed, max 200); `comment` is optional
+ * (max 500) and is omitted from the payload when empty.
+ */
+export function cancelGuestOrder(orderId, { reason, comment } = {}) {
+  const body = { reason: String(reason || "").trim() };
+  const trimmedComment = String(comment || "").trim();
+  if (trimmedComment) body.comment = trimmedComment;
+
+  return apiClient.post(`/guest/orders/${encodeURIComponent(orderId)}/cancel`, body);
+}

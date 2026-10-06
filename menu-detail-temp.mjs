@@ -40,7 +40,7 @@ const MENU = {
           name: "Paneer Tikka",
           description: "Grilled cottage cheese with spices",
           priceMinor: 32000,
-          rating: 4.4,
+          rating: 3.33333333333333,
           isVeg: true,
           isOutOfStock: false,
           image: null,
@@ -169,7 +169,12 @@ rec("one rating star in modal", ratingCount === 1, `count=${ratingCount}`);
 const metaRow = modal.locator("div.flex.items-center.justify-between").first();
 const metaText = await metaRow.innerText();
 rec("meta row carries price", metaText.includes("₹320"), metaText.replace(/\n/g, " | "));
-rec("meta row carries rating value", metaText.includes("4.4"), "");
+rec("meta row carries rating value", metaText.includes("3.3"), metaText.replace(/\n/g, " | "));
+rec(
+  "long-float rating truncated to one decimal",
+  metaText.includes("3.3") && !/\d\.\d{3,}/.test(metaText),
+  metaText.replace(/\n/g, " | "),
+);
 const vegBox = await metaRow.locator("div.border-green-600").count();
 rec("meta row carries veg indicator", vegBox >= 1, `vegBoxes=${vegBox}`);
 const chipInRow = await metaRow.locator('span[title="Chef\'s Special"]').count();

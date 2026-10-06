@@ -4,7 +4,7 @@ import { enrichMenuItem } from "@/lib/menu-cache";
 
 export const ORDER_STATUS_LABELS = {
   SCHEDULED: "Scheduled",
-  NEW: "Accepted",
+  NEW: "Placed",
   PREPARING: "Preparing",
   READY: "Ready",
   DELIVERED: "Delivered",
@@ -39,35 +39,54 @@ export function isDelivered(status) {
   return status === "DELIVERED";
 }
 
+/**
+ * "Kitchen has accepted" is signalled either by an `acceptedAt` timestamp while the
+ * status is still NEW, or by the status moving past NEW - the guest screen needs to
+ * tell "Order Placed" (not accepted yet) from "Order Confirmed" (accepted).
+ */
+export function isAccepted(order) {
+  const status = order?.status || "";
+  if (status === "SCHEDULED" || status === "CANCELLED") return false;
+  return Boolean(order?.acceptedAt) || ["PREPARING", "READY", "DELIVERED"].includes(status);
+}
+
 /** Drives the timeline on the order status screen and the floating status panel. */
 export function buildOrderSteps(status, order = {}) {
   const cancelled = isCancelled(status);
   const delivered = isDelivered(status);
   const scheduled = status === "SCHEDULED";
+  const accepted = isAccepted({ status, acceptedAt: order.acceptedAt });
 
   const timestamp = formatTime12(order.placedAt);
 
+  // The cancelled screen follows the Figma copy: the reason lives in the
+  // Cancel Reason card below, and the remaining steps show their estimates.
+  const CANCELLED_SUBTITLES = ["Cancelled", "In Process…", "Est. 15 Minutes", "Est. 25 Minutes"];
+
   return STEP_SEQUENCE.map((step, index) => {
-    if (cancelled && index === 0) {
+    if (cancelled) {
       return {
         id: step.id,
-        title: "Order Cancelled",
-        subtitle: order.cancelReason || "This order was cancelled",
+        title: index === 0 ? "Order Cancelled" : step.title,
+        subtitle: CANCELLED_SUBTITLES[index],
         done: false,
-        cancelled: true,
-        timestamp: formatTime12(order.cancelledAt) || timestamp,
+        cancelled: index === 0,
+        timestamp: index === 0 ? formatTime12(order.cancelledAt) || timestamp : "",
       };
     }
 
-    const done = !cancelled && step.doneFrom.includes(status);
-    const isCurrent = !done && !cancelled && willAdvance(status, index);
+    // The accepted step only completes once the kitchen actually accepts; before
+    // that (NEW without acceptedAt, or SCHEDULED) it stays pending.
+    const done = step.doneFrom.includes(status) && (index !== 0 || accepted);
+    const isCurrent = !done && willAdvance(status, index, accepted);
 
     let subtitle = step.subtitle;
-    if (scheduled && !done) {
-      subtitle =
-        index === 0
-          ? "Waiting for the kitchen to accept"
-          : "Starts shortly before your scheduled time";
+    if (index === 0 && !done) {
+      subtitle = "Waiting for the kitchen to accept";
+    } else if (scheduled && !done) {
+      subtitle = "Starts shortly before your scheduled time";
+    } else if (index === 1 && status === "NEW" && !accepted) {
+      subtitle = "Starts after the kitchen accepts";
     } else if (done && delivered) {
       subtitle = "Done";
     } else if (isCurrent) {
@@ -85,8 +104,8 @@ export function buildOrderSteps(status, order = {}) {
   });
 }
 
-function willAdvance(status, index) {
-  if (status === "NEW") return index === 1;
+function willAdvance(status, index, accepted) {
+  if (status === "NEW") return accepted && index === 1;
   if (status === "PREPARING") return index === 2;
   if (status === "READY") return index === 3;
   return false;
@@ -135,6 +154,8 @@ export function toActiveOrder(order) {
     status,
     statusLabel: ORDER_STATUS_LABELS[status] || status,
     statusTone: ORDER_STATUS_TONE[status] || "preparing",
+    // Kitchen acceptance drives the "Order Placed" vs "Order Confirmed" headline.
+    accepted: isAccepted(order),
     items: (order.items || []).map(toOrderItem),
     itemCount: (order.items || []).reduce((sum, entry) => sum + entry.qty, 0),
     totalAmount: fromMinor(order.totalMinor),
@@ -149,6 +170,9 @@ export function toActiveOrder(order) {
     deliveredAt: order.deliveredAt || null,
     cancelledAt: order.cancelledAt || null,
     cancelReason: order.cancelReason || null,
+    // Guest cancels may carry an optional comment alongside the reason; the box
+    // on the cancelled screen hides itself when the server sends none.
+    cancelComment: order.cancelComment ?? order.comment ?? null,
     // GET /guests/me embeds the submitted review on each order. Keep it attached
     // so the stay/history cards can show ratings from the server, not local state.
     review: order.review || null,

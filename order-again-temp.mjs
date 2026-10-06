@@ -261,20 +261,35 @@ rec(
 const cartText = (await page.locator("body").innerText()).toLowerCase();
 rec("cart shows the reordered dish", cartText.includes(String(LINE_1.itemName).toLowerCase()), LINE_1.itemName);
 
-// ---- Scenario 2: finished order on /order-status - "Order Again" same behaviour
+// ---- Scenario 2: finished order on /order-status - rate + summary buttons
 await page.goto(`${BASE}/order-status`, { waitUntil: "domcontentloaded" });
 await page.waitForSelector("text=Order Delivered!", { timeout: 20000 });
 
 const statusText = (await page.locator("body").innerText()).toLowerCase();
 rec(
-  "finished order offers Order Again, not Back to Kitchens",
-  statusText.includes("order again") && !statusText.includes("back to kitchens"),
+  "delivered screen offers Rate Your Experience and View Order Summary",
+  statusText.includes("rate your experience") && statusText.includes("view order summary"),
+  "",
+);
+rec(
+  "delivered screen drops Order Again and Back to Kitchens",
+  !statusText.includes("order again") && !statusText.includes("back to kitchens"),
   "",
 );
 
-await page.locator('button:has-text("Order Again")').click();
+await page.locator("#page-rate-experience").click();
+await page.waitForURL(/\/profile\/rating-feedback\?orderId=/, { timeout: 20000 });
+rec("Rate Your Experience opens the feedback page", page.url().includes("orderId="), page.url());
+
+await page.goBack();
+await page.waitForSelector("text=Order Delivered!", { timeout: 20000 });
+await page.locator("#page-view-summary").click();
+await page.waitForURL(/\/profile\/rating-feedback\?orderId=/, { timeout: 20000 });
+rec("View Order Summary opens the same details page", page.url().includes("orderId="), page.url());
+
+await page.locator('button:has-text("reorder")').click();
 await page.waitForURL("**/cart", { timeout: 20000 });
-rec("order-status Order Again navigates to the cart", page.url().includes("/cart"), page.url());
+rec("reorder from the details page navigates to the cart", page.url().includes("/cart"), page.url());
 
 const statusAdd = addBodies[1];
 rec(
@@ -296,6 +311,34 @@ await page.waitForSelector('h3:has-text("Your Rating")', { timeout: 20000 });
 const reviewText = (await page.locator("body").innerText()).toLowerCase();
 rec("view feedback opens the read-only rating view", reviewText.includes("your rating"), "");
 rec("read-only view shows the server comment", reviewText.includes("lovely tikka"), "");
+
+// ---- Scenario 4: profile cards share the stay-style arrow, no dropdowns
+await page.goto(`${BASE}/profile`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector('h3:has-text("Order History")', { timeout: 20000 });
+await page.waitForSelector('h3:has-text("Order Status")', { timeout: 20000 });
+
+const arrowCount = await page.locator('img[src*="external_link"]').count();
+rec(
+  "all three profile cards show the stay-style arrow",
+  arrowCount === 3,
+  `arrows=${arrowCount} expected=3`,
+);
+const chevronCount = await page.locator('img[src*="chevron_down"]').count();
+rec("no dropdown chevron on the profile cards", chevronCount === 0, `chevrons=${chevronCount}`);
+
+await page.locator('h3:has-text("Order History")').click();
+await page.waitForURL("**/profile/order-history", { timeout: 20000 });
+rec(
+  "Order History card opens its page",
+  page.url().includes("/profile/order-history"),
+  page.url(),
+);
+
+await page.goto(`${BASE}/profile`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector('h3:has-text("Order Status")', { timeout: 20000 });
+await page.locator('h3:has-text("Order Status")').click();
+await page.waitForURL("**/active-orders", { timeout: 20000 });
+rec("Order Status card opens active orders", page.url().includes("/active-orders"), page.url());
 
 await ctx.close();
 await browser.close();

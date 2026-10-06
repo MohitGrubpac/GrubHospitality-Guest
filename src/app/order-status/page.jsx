@@ -8,7 +8,10 @@ import { useRoom } from "@/component/providers/RoomProvider";
 import { useOrders } from "@/component/providers/OrdersProvider";
 import { useCart } from "@/component/providers/CartProvider";
 import { buildReorderEntries } from "@/hooks/useOrders";
-import { showError } from "@/component/ui/Toast";
+import CancelOrderModal from "@/component/ui/CancelOrderModal";
+import { cancelGuestOrder } from "@/services/orderService";
+import { invalidateRequests } from "@/lib/request-cache";
+import { showError, showSuccess } from "@/component/ui/Toast";
 import VegIndicator from "@/component/ui/VegIndicator";
 import { formatTime12 } from "@/lib/date";
 
@@ -87,9 +90,11 @@ export default function OrderStatusPage() {
   const router = useRouter();
   const { guest } = useAuth();
   const { selectedRoom } = useRoom();
-  const { activeOrder, isLoading, hasActiveOrder } = useOrders();
+  const { activeOrder, isLoading, hasActiveOrder, refreshOrders } = useOrders();
   const { reorderItems } = useCart();
   const [isReordering, setIsReordering] = useState(false);
+  const [isCancelOpen, setIsCancelOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   if (isLoading && !activeOrder) {
     return (
@@ -134,7 +139,29 @@ export default function OrderStatusPage() {
     }
   };
 
+  // Cancel is only offered while the order is NEW or SCHEDULED; the sheet stays
+  // open on failure (toast) and closes once the server confirms the cancellation.
+  const handleCancelOrder = async ({ reason, comment }) => {
+    setIsCancelling(true);
+    try {
+      await cancelGuestOrder(activeOrder.id, { reason, comment });
+      // The tracked-detail cache would keep serving the pre-cancel copy.
+      invalidateRequests("orders:detail:");
+      setIsCancelOpen(false);
+      showSuccess("Order cancelled", "Your order has been cancelled.");
+      await refreshOrders();
+    } catch {
+      showError("We couldn't cancel the order. Please try again.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const scheduledDisplay = formatTime12(activeOrder.scheduledAt);
+
+  // NEW without kitchen acceptance reads "Order Placed"; once the kitchen has
+  // accepted (acceptedAt set or the status moved past NEW) it reads "Order Confirmed".
+  const isPlaced = activeOrder.status === "NEW" && !activeOrder.accepted;
 
   const headline = isCancelled
     ? "Order Cancelled!"
@@ -142,7 +169,9 @@ export default function OrderStatusPage() {
       ? "Order Delivered!"
       : isScheduled
         ? "Order Scheduled!"
-        : "Order Confirmed!";
+        : isPlaced
+          ? "Order Placed!"
+          : "Order Confirmed!";
 
   const subline = isCancelled
     ? "Your order has been cancelled, you can place a new order anytime"
@@ -150,7 +179,9 @@ export default function OrderStatusPage() {
       ? "Your order has been successfully delivered. Enjoy your meal!"
       : isScheduled
         ? `We will start preparing closer to ${scheduledDisplay}.`
-        : "Your order has been successfully placed and is being prepared by our kitchen team.";
+        : isPlaced
+          ? "We've received your order and it is being confirmed by our kitchen team."
+          : "Your order has been successfully placed and is being prepared by our kitchen team.";
 
   const bannerImage = isCancelled
     ? "/profile/cancel_badge.svg"
@@ -159,6 +190,21 @@ export default function OrderStatusPage() {
       : isScheduled
         ? "/profile/schedule_badge.svg"
         : "/Done.png";
+
+  // Cancel stays available only while the order is placed-new or scheduled.
+  const canCancel = activeOrder.status === "NEW" || activeOrder.status === "SCHEDULED";
+
+  const feedbackHref = `/profile/rating-feedback?orderId=${activeOrder.id}`;
+
+  const callReception = (widthClass) => (
+    <a
+      href="tel:+9111234567890"
+      className={`${widthClass} flex items-center justify-center gap-2 py-3.5 bg-[#FF4B4B] text-white rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-600 transition-colors`}
+    >
+      <Image src="/profile/phone_white.svg" alt="" width={16} height={16} className="w-4 h-4 object-contain" />
+      Call Reception
+    </a>
+  );
 
   return (
     <div className="w-full min-h-screen bg-[#f7f8fa] flex flex-col items-center select-none">
@@ -207,7 +253,7 @@ export default function OrderStatusPage() {
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#f0f2f1]">
             <h3 className="text-sm font-bold text-[#03130a]">Delivery Details</h3>
             <span className="text-xs text-[#6b7971] mt-0.5 block">
-              Order {activeOrder.orderCode || activeOrder.id}
+              Order ID #{activeOrder.orderCode || activeOrder.id}
             </span>
             <div className="h-px bg-[#f0f2f1] my-4" />
             <div className="grid grid-cols-2">
@@ -344,11 +390,18 @@ export default function OrderStatusPage() {
             </div>
           )}
 
-          {!hasActiveOrder && (
+          {isCancelled && (
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#f0f2f1]">
               <h3 className="text-sm font-bold text-[#03130a] mb-3">Cancel Reason</h3>
-              <div className="border border-[#e0e3e1] rounded-xl px-4 py-3 text-sm text-[#03130a] bg-[#f7f8fa]">
-                {activeOrder.cancelReason || "Cancelled"}
+              <div className="flex flex-col gap-2">
+                <div className="border border-[#e0e3e1] rounded-xl px-4 py-3 text-sm text-[#03130a] bg-[#f7f8fa]">
+                  {activeOrder.cancelReason || "Cancelled"}
+                </div>
+                {activeOrder.cancelComment && (
+                  <div className="border border-[#e0e3e1] rounded-xl px-4 py-3 text-sm text-[#03130a] bg-[#f7f8fa]">
+                    {activeOrder.cancelComment}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -356,15 +409,71 @@ export default function OrderStatusPage() {
 
         {/* Fixed Bottom */}
         <div className="absolute bottom-0 left-0 w-full bg-[#f7f8fa] px-4 py-3 flex flex-col gap-2 z-30">
-          <button
-            type="button"
-            onClick={hasActiveOrder ? () => router.replace("/home") : handleOrderAgain}
-            disabled={isReordering}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#FF4B4B] text-white rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {hasActiveOrder ? "Back to Kitchens" : isReordering ? "adding..." : "Order Again"}
-          </button>
+          {canCancel ? (
+            <div className="flex flex-col gap-2">
+              {callReception("w-full")}
+              <button
+                type="button"
+                onClick={() => setIsCancelOpen(true)}
+                id="page-cancel-order"
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-white border border-[#FF4B4B] text-[#FF4B4B] rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-50 transition-colors"
+              >
+                Cancel Order
+              </button>
+            </div>
+          ) : isCancelled ? (
+            <div className="flex gap-2">
+              {callReception("flex-1")}
+              <button
+                type="button"
+                onClick={handleOrderAgain}
+                disabled={isReordering}
+                id="page-order-again"
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-white border border-[#FF4B4B] text-[#FF4B4B] rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-50 transition-colors disabled:opacity-60"
+              >
+                {isReordering ? "adding..." : "Order Again"}
+              </button>
+            </div>
+          ) : isDelivered ? (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(feedbackHref)}
+                id="page-rate-experience"
+                className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#FF4B4B] text-white rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-600 transition-colors"
+              >
+                Rate Your Experience
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(feedbackHref)}
+                id="page-view-summary"
+                className="w-full flex items-center justify-center gap-2 py-3 text-sm font-bold uppercase tracking-wide text-[#6b7971] hover:text-[#03130a] transition-colors cursor-pointer"
+              >
+                View Order Summary
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={hasActiveOrder ? () => router.replace("/home") : handleOrderAgain}
+              disabled={isReordering}
+              className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#FF4B4B] text-white rounded-xl text-sm font-bold uppercase tracking-wide cursor-pointer hover:bg-red-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {hasActiveOrder ? "Back to Kitchens" : isReordering ? "adding..." : "Order Again"}
+            </button>
+          )}
         </div>
+
+        {isCancelOpen && (
+          <CancelOrderModal
+            onClose={() => {
+              if (!isCancelling) setIsCancelOpen(false);
+            }}
+            onSubmit={handleCancelOrder}
+            submitting={isCancelling}
+          />
+        )}
       </div>
     </div>
   );
