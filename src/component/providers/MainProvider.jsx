@@ -1,16 +1,16 @@
 "use client";
 
+import { Provider } from "react-redux";
 import ToastProvider from "../ui/ToastProvider";
-import { CartProvider } from "./CartProvider";
-import { RoomProvider } from "./RoomProvider";
+import { store } from "@/store";
+import StoreEffects from "@/store/effects";
 
 export default function MainProvider({ children }) {
   return (
-    <>
+    <Provider store={store}>
       <ToastProvider />
-      <RoomProvider>
-        <CartProvider>{children}</CartProvider>
-      </RoomProvider>
-    </>
+      <StoreEffects />
+      {children}
+    </Provider>
   );
 }

@@ -1,0 +1,257 @@
+{
+  "helpCategories": [
+    {
+      "id": "1",
+      "title": "My Orders",
+      "subtitle": "View your recently delivered orders"
+    },
+    {
+      "id": "2",
+      "title": "Smart Food Box",
+      "subtitle": "View your recently delivered orders"
+    },
+    {
+      "id": "3",
+      "title": "Hotel Services",
+      "subtitle": "View your recently delivered orders"
+    },
+    {
+      "id": "4",
+      "title": "Account & App",
+      "subtitle": "View your recently delivered orders"
+    }
+  ],
+  "faqs": [
+    {
+      "id": "faq-1",
+      "question": "How to i place an order?",
+      "answer": "Select dishes from any restaurant menu, customize your order, choose instant delivery or schedule time, and click place order."
+    },
+    {
+      "id": "faq-2",
+      "question": "How do I schedule a meal?",
+      "answer": "Use the schedule banner on the home screen to pick a future date and time slot for your food delivery."
+    },
+    {
+      "id": "faq-3",
+      "question": "How does the Smart Food Box work?",
+      "answer": "Your order is delivered directly to your room's secure thermal food box, keeping your meals fresh and hot."
+    },
+    {
+      "id": "faq-4",
+      "question": "Can I cancel my order?",
+      "answer": "You can cancel your order within 2 minutes of placing it directly from the Order Status section."
+    },
+    {
+      "id": "faq-5",
+      "question": "How can I modify my order?",
+      "answer": "To modify items or special notes, contact hotel room dining reception before the order enters preparation."
+    },
+    {
+      "id": "faq-6",
+      "question": "What should I do if my food is delayed?",
+      "answer": "You can track real-time kitchen status in the app or click CALL RECEPTION to speak directly with guest service."
+    }
+  ],
+  "ratingSamples": {
+    "completedOrders": [
+      {
+        "id": "oh-comp-1",
+        "restaurantName": "House Of Ming",
+        "time": "13 June '26, 17:09",
+        "status": "Delivered",
+        "items": [
+          {
+            "name": "Kolkata Mutton Biryani",
+            "qty": 1,
+            "isVeg": false,
+            "price": 1650
+          },
+          {
+            "name": "Crispy Honey Chilli Potato",
+            "qty": 2,
+            "isVeg": true,
+            "price": 480
+          }
+        ],
+        "moreCount": 1,
+        "totalAmount": 2610,
+        "orderRating": 5,
+        "foodRating": 4
+      },
+      {
+        "id": "oh-comp-2",
+        "restaurantName": "Nawab's Biryani House",
+        "time": "12 June '26, 20:30",
+        "status": "Delivered",
+        "items": [
+          {
+            "name": "Hyderabadi Biryani",
+            "qty": 2,
+            "isVeg": false,
+            "price": 1400
+          },
+          {
+            "name": "Mirchi Ka Salan",
+            "qty": 1,
+            "isVeg": true,
+            "price": 260
+          }
+        ],
+        "moreCount": 0,
+        "totalAmount": 3060,
+        "orderRating": 4,
+        "foodRating": 5
+      },
+      {
+        "id": "oh-comp-3",
+        "restaurantName": "Khyber Royal Grill",
+        "time": "11 June '26, 13:15",
+        "status": "Delivered",
+        "items": [
+          {
+            "name": "Butter Chicken",
+            "qty": 1,
+            "isVeg": false,
+            "price": 850
+          },
+          {
+            "name": "Garlic Naan",
+            "qty": 2,
+            "isVeg": true,
+            "price": 120
+          },
+          {
+            "name": "Dal Makhani",
+            "qty": 1,
+            "isVeg": true,
+            "price": 640
+          }
+        ],
+        "moreCount": 0,
+        "totalAmount": 1730,
+        "orderRating": 5,
+        "foodRating": 5
+      },
+      {
+        "id": "oh-comp-4",
+        "restaurantName": "La Piazza",
+        "time": "10 June '26, 19:45",
+        "status": "Delivered",
+        "items": [
+          {
+            "name": "Margherita D.O.P.",
+            "qty": 1,
+            "isVeg": true,
+            "price": 820
+          },
+          {
+            "name": "Tiramisu",
+            "qty": 1,
+            "isVeg": true,
+            "price": 420
+          }
+        ],
+        "moreCount": 0,
+        "totalAmount": 1240,
+        "orderRating": 4,
+        "foodRating": 4
+      }
+    ],
+    "canceledOrders": [
+      {
+        "id": "oh-canc-1",
+        "restaurantName": "The China Kitchen",
+        "time": "13 June '26, 12:00",
+        "status": "Canceled",
+        "cancellationReason": "Changed my mind",
+        "items": [
+          {
+            "name": "Kung Pao Chicken",
+            "qty": 1,
+            "isVeg": false,
+            "price": 690
+          },
+          {
+            "name": "Vegetable Fried Rice",
+            "qty": 1,
+            "isVeg": true,
+            "price": 560
+          }
+        ]
+      },
+      {
+        "id": "oh-canc-2",
+        "restaurantName": "Spice Route Café",
+        "time": "12 June '26, 18:20",
+        "status": "Canceled",
+        "cancellationReason": "Take too much time",
+        "items": [
+          {
+            "name": "Chicken Tikka Biryani",
+            "qty": 1,
+            "isVeg": false,
+            "price": 1250
+          },
+          {
+            "name": "Garlic Naan",
+            "qty": 2,
+            "isVeg": true,
+            "price": 120
+          }
+        ]
+      },
+      {
+        "id": "oh-canc-3",
+        "restaurantName": "TK's Oriental Grill",
+        "time": "11 June '26, 21:10",
+        "status": "Canceled",
+        "cancellationReason": "By mistake order",
+        "items": [
+          {
+            "name": "California Roll",
+            "qty": 2,
+            "isVeg": false,
+            "price": 780
+          },
+          {
+            "name": "Vegetable Teppanyaki",
+            "qty": 1,
+            "isVeg": true,
+            "price": 720
+          }
+        ]
+      },
+      {
+        "id": "oh-canc-4",
+        "restaurantName": "The Polo Lounge & Bistro",
+        "time": "10 June '26, 14:30",
+        "status": "Canceled",
+        "cancellationReason": "Changed my mind",
+        "items": [
+          {
+            "name": "Classic Wagyu Slider",
+            "qty": 2,
+            "isVeg": false,
+            "price": 720
+          },
+          {
+            "name": "Truffle Fries",
+            "qty": 1,
+            "isVeg": true,
+            "price": 480
+          }
+        ]
+      }
+    ]
+  },
+  "reviewCopy": {
+    "fallbackOrder": {
+      "restaurantName": "House Of Ming",
+      "time": "13 June' 26, 17:09",
+      "status": "Delivered",
+      "items": [],
+      "totalAmount": 0
+    }
+  }
+}

@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useMemo, Suspense } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import data from "@/data/data.json";
-
-
 import SearchInputBar from "@/component/search/SearchInputBar";
 import SearchTabs from "@/component/search/SearchTabs";
 import SearchFilterBar from "@/component/search/SearchFilterBar";
@@ -16,179 +13,69 @@ import FilterModal, {
   CUISINE_OPTIONS,
   DIETARY_OPTIONS,
   PRICE_OPTIONS,
-  getPriceRange,
 } from "@/component/search/FilterModal";
 import DishDetailModal from "@/component/search/DishDetailModal";
-import { useCart } from "@/component/providers/CartProvider";
+import { useDishSearch, useKitchens } from "@/hooks/useCatalog";
+import { useDishFilters } from "@/hooks/useDishFilters";
 
 function SearchResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialQuery = searchParams ? searchParams.get("q") || "Biryani" : "Biryani";
-  const { addToCart } = useCart();
+  const initialQuery = searchParams?.get("q") || "";
+
+  const { dishes, isLoading } = useDishSearch();
+  const { kitchens } = useKitchens();
+  const { filterDishes, groupDishesByKitchen } = useDishFilters();
 
   const [query, setQuery] = useState(initialQuery);
-  const [activeTab, setActiveTab] = useState("dishes"); // "dishes" | "restaurant"
+  const [activeTab, setActiveTab] = useState("dishes");
   const [isVegOnly, setIsVegOnly] = useState(false);
-  const [isRated4Plus, setIsRated4Plus] = useState(false);
   const [selectedSort, setSelectedSort] = useState("relevance");
   const [selectedCuisines, setSelectedCuisines] = useState([]);
   const [selectedPrices, setSelectedPrices] = useState([]);
   const [selectedDietary, setSelectedDietary] = useState([]);
+  const [isRated3Only, setIsRated3Only] = useState(false);
 
-  // Modal states
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeDishModal, setActiveDishModal] = useState(null);
 
-  const { dishes = [], restaurants = [] } = data;
+  const filteredDishes = useMemo(
+    () =>
+      filterDishes(dishes, {
+        query,
+        isVegOnly,
+        cuisines: selectedCuisines,
+        prices: selectedPrices,
+        dietary: selectedDietary,
+        sort: selectedSort,
+        minRating: isRated3Only ? 3 : null,
+      }),
+    [
+      filterDishes,
+      dishes,
+      query,
+      isVegOnly,
+      selectedCuisines,
+      selectedPrices,
+      selectedDietary,
+      selectedSort,
+      isRated3Only,
+    ],
+  );
 
-  const handleAddToCart = (dish) => {
-    const rest = restaurants.find((r) => r.id === dish.restaurantId);
-    addToCart(
-      rest
-        ? { id: rest.id, name: rest.name, slug: rest.slug }
-        : { id: dish.restaurantId, name: dish.kitchenName, slug: dish.restaurantSlug },
-      dish,
-    );
-  };
+  const restaurantGroups = useMemo(
+    () => groupDishesByKitchen(filteredDishes, kitchens),
+    [groupDishesByKitchen, filteredDishes, kitchens],
+  );
 
-  // Filter Dishes
-  const filteredDishes = useMemo(() => {
-    let result = dishes.filter((dish) => {
-      const q = query.toLowerCase();
-      const matchesQuery =
-        !q ||
-        dish.name.toLowerCase().includes(q) ||
-        dish.kitchenName.toLowerCase().includes(q) ||
-        dish.cuisine.toLowerCase().includes(q);
-      const matchesVeg =
-        (!isVegOnly || dish.isVeg === true) &&
-        (selectedDietary.length === 0 ||
-          selectedDietary.every((tag) => {
-            if (tag === "Veg") return dish.isVeg === true;
-            if (tag === "Non-Veg") return dish.isVeg === false;
-            const desc = (dish.description || "").toLowerCase();
-            const name = (dish.name || "").toLowerCase();
-            if (tag === "Nut Free") {
-              return (
-                desc.includes("nut free") ||
-                desc.includes("nut-free") ||
-                (!desc.includes("nut") &&
-                  !desc.includes("peanut") &&
-                  !desc.includes("cashew") &&
-                  !desc.includes("walnut") &&
-                  !desc.includes("almond") &&
-                  !name.includes("nut") &&
-                  !name.includes("peanut") &&
-                  !name.includes("cashew") &&
-                  !name.includes("walnut") &&
-                  !name.includes("almond"))
-              );
-            }
-            if (tag === "No Refined sugar") {
-              return (
-                desc.includes("sugar free") ||
-                desc.includes("sugar-free") ||
-                desc.includes("no refined sugar") ||
-                (!desc.includes("sugar") &&
-                  !desc.includes("syrup") &&
-                  !desc.includes("honey") &&
-                  !desc.includes("caramel") &&
-                  !name.includes("sugar") &&
-                  !name.includes("syrup") &&
-                  !name.includes("honey") &&
-                  !name.includes("caramel"))
-              );
-            }
-            if (tag === "Low Calories") {
-              return (
-                desc.includes("low calorie") ||
-                desc.includes("low-calorie") ||
-                desc.includes("light") ||
-                desc.includes("salad") ||
-                desc.includes("vegetable") ||
-                dish.price < 1000
-              );
-            }
-            if (tag === "Dairy free") {
-              return (
-                desc.includes("dairy free") ||
-                desc.includes("dairy-free") ||
-                (!desc.includes("cheese") &&
-                  !desc.includes("butter") &&
-                  !desc.includes("milk") &&
-                  !desc.includes("cream") &&
-                  !desc.includes("yogurt") &&
-                  !name.includes("cheese") &&
-                  !name.includes("butter") &&
-                  !name.includes("milk") &&
-                  !name.includes("cream") &&
-                  !name.includes("yogurt"))
-              );
-            }
-            return true;
-          }));
-      const matchesRating = !isRated4Plus || (dish.rating && dish.rating >= 4.0);
-      const matchesCuisine =
-        selectedCuisines.length === 0 || selectedCuisines.includes(dish.cuisine);
-      const matchesPrice =
-        selectedPrices.length === 0 ||
-        selectedPrices.some((label) => {
-          const range = getPriceRange(label);
-          return range && dish.price >= range.min && dish.price <= range.max;
-        });
-
-      return (
-        matchesQuery && matchesVeg && matchesRating && matchesCuisine && matchesPrice
-      );
-    });
-
-    // Sorting logic
-    if (selectedSort === "price_low_high") {
-      result.sort((a, b) => a.price - b.price);
-    } else if (selectedSort === "price_high_low") {
-      result.sort((a, b) => b.price - a.price);
-    } else if (selectedSort === "rating_high_low") {
-      result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-    } else if (selectedSort === "rating_low_high") {
-      result.sort((a, b) => (a.rating || 0) - (b.rating || 0));
-    }
-
-    return result;
-  }, [dishes, query, isVegOnly, isRated4Plus, selectedCuisines, selectedPrices, selectedDietary, selectedSort]);
-
-  // Filter Restaurants & group dishes by restaurant
-  const restaurantGroups = useMemo(() => {
-    return restaurants
-      .map((rest) => {
-        const restDishes = filteredDishes.filter(
-          (d) => d.restaurantId === rest.id || d.kitchenName.toLowerCase().includes(rest.name.toLowerCase())
-        );
-        return {
-          restaurant: rest,
-          dishes: restDishes.length > 0 ? restDishes : filteredDishes.slice(0, 3),
-        };
-      })
-      .filter((group) => {
-        const q = query.toLowerCase();
-        if (!q) return true;
-        return (
-          group.restaurant.name.toLowerCase().includes(q) ||
-          group.restaurant.cuisine.toLowerCase().includes(q) ||
-          group.dishes.length > 0
-        );
-      });
-  }, [restaurants, filteredDishes, query]);
+  const isEmptyResult = !isLoading && filteredDishes.length === 0;
 
   return (
     <div className="w-full h-screen bg-[#f8faf9] flex flex-col items-center select-none overflow-hidden">
       <div className="w-full max-w-[480px] sm:max-w-[768px] bg-white h-screen shadow-sm flex flex-col overflow-hidden relative">
-
-
-        <main className="flex-1 px-5 pt-3 pb-16 flex flex-col gap-4 overflow-y-auto">
-          {/* Results Sub Header */}
-          <div className="flex items-center gap-3 py-1 shrink-0">
+        <div className="shrink-0 px-5 pt-3 pb-3 bg-white border-b border-[#eff1f0]/60 flex flex-col gap-4 z-40">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => router.push("/home")}
@@ -203,46 +90,48 @@ function SearchResultsContent() {
                 className="w-5 h-5 object-contain"
               />
             </button>
-            <h1 className="text-lg font-bold text-[#03130a]">
-              Results for &ldquo;{query || "Biryani"}&rdquo;
+            <h1 className="text-lg font-bold text-[#03130a] truncate">
+              Results for &ldquo;{query || "all dishes"}&rdquo;
             </h1>
           </div>
 
-          {/*  Veg Toggle  */}
           <SearchInputBar
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
             isVegOnly={isVegOnly}
             onToggleVeg={() => setIsVegOnly(!isVegOnly)}
             placeholder="Search dish or kitchen"
           />
 
-          {/* Active Tabs */}
           <SearchTabs activeTab={activeTab} onSelectTab={setActiveTab} />
 
-          {/* Filter & Sort Action */}
           <SearchFilterBar
             onOpenFilter={() => setIsFilterOpen(true)}
             onOpenSort={() => setIsSortOpen(true)}
-            isRated4Plus={isRated4Plus}
-            onToggleRated4Plus={() => setIsRated4Plus(!isRated4Plus)}
+            isRated3Only={isRated3Only}
+            onToggleRated3={() => setIsRated3Only((v) => !v)}
           />
+        </div>
 
-          {/* Tab Content List */}
-          <div className="flex flex-col gap-4 mt-1">
-            {activeTab === "dishes" ? (
+        {/* Scrollable Tab Content Area */}
+        <main className="flex-1 px-5 pt-4 pb-20 flex flex-col gap-4 overflow-y-auto bg-[#f7f8fa]">
+          <div className="flex flex-col gap-4">
+            {isLoading ? (
+              <div className="text-center py-12 text-sm text-[#6b7971]">Loading menus...</div>
+            ) : activeTab === "dishes" ? (
               filteredDishes.length > 0 ? (
                 filteredDishes.map((dish) => (
                   <DishCard
                     key={dish.id}
                     dish={dish}
                     onSelectDish={(item) => setActiveDishModal(item)}
-                    onAddToCart={handleAddToCart}
                   />
                 ))
               ) : (
                 <div className="text-center py-12 text-sm text-[#6b7971]">
-                  No dishes found matching &ldquo;{query}&rdquo;
+                  {isEmptyResult
+                    ? `No dishes found matching \u201c${query}\u201d`
+                    : "No dishes available right now."}
                 </div>
               )
             ) : restaurantGroups.length > 0 ? (
@@ -252,12 +141,13 @@ function SearchResultsContent() {
                   restaurant={group.restaurant}
                   dishes={group.dishes}
                   onSelectDish={(item) => setActiveDishModal(item)}
-                  onAddToCart={handleAddToCart}
                 />
               ))
             ) : (
               <div className="text-center py-12 text-sm text-[#6b7971]">
-                No restaurants found matching &ldquo;{query}&rdquo;
+                {isEmptyResult
+                  ? `No kitchens found matching \u201c${query}\u201d`
+                  : "No kitchens available right now."}
               </div>
             )}
           </div>
@@ -295,7 +185,6 @@ function SearchResultsContent() {
           isOpen={Boolean(activeDishModal)}
           dish={activeDishModal}
           onClose={() => setActiveDishModal(null)}
-          onAddToCart={handleAddToCart}
         />
       </div>
     </div>

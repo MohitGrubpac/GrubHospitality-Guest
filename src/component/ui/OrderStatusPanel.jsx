@@ -1,43 +1,76 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/component/providers/CartProvider";
+import { useOrders } from "@/component/providers/OrdersProvider";
 
-const CART_BAR_HEIGHT = 80;
-
-// ---- Icon helpers ----
-function CheckIcon() {
-  return (
+const STEP_ICONS = {
+  accepted: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
       <path d="M5 13l4 4L19 7" stroke="#9ca8a2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-function PrepIcon() {
-  return (
+  ),
+  prepared: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
       <path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 4v6l4 2" stroke="#9ca8a2" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
-  );
-}
-function ReadyIcon() {
-  return (
+  ),
+  ready: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
       <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z" fill="#9ca8a2" />
     </svg>
-  );
-}
-function DeliverIcon() {
-  return (
+  ),
+  delivery: (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
       <path d="M3 11l19-9-9 19-2-8-8-2z" stroke="#9ca8a2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
+  ),
+};
+
+const STATUS_MESSAGES = {
+  SCHEDULED: "Your order is scheduled with the kitchen.",
+  NEW: "The kitchen has received your order.",
+  PREPARING: "Your food is being prepared right now.",
+  READY: "Your order is ready and on its way.",
+  DELIVERED: "Your order has been delivered.",
+  CANCELLED: "This order was cancelled.",
+};
+
+// Expanded sheet copy: [prefix, highlighted keyword, suffix] - the keyword renders
+// green italic exactly like the Figma ("We've successfully received your order.").
+const STATUS_HIGHLIGHT = {
+  SCHEDULED: ["Your order is ", "scheduled", " with the kitchen."],
+  NEW: ["We've successfully ", "received", " your order."],
+  PREPARING: ["Your food is being ", "prepared", " right now."],
+  READY: ["Your order is ", "ready", " and on its way."],
+  DELIVERED: ["Your order has been ", "delivered", "."],
+  CANCELLED: ["This order was ", "cancelled", "."],
+};
+
+/**
+ * Expanded-sheet step copy per Figma: Done (green) / In Process... (orange italic)
+ * / Est. 15 Minutes (grey italic). Scheduled and cancelled orders keep the
+ * adapter's own wording since the estimates do not apply there.
+ */
+function panelSubtitle(step, index, steps, status) {
+  if (status === "SCHEDULED" || status === "CANCELLED") {
+    return {
+      text: step.subtitle,
+      className: step.cancelled ? "text-red-500 font-semibold" : "text-[#9ca8a2]",
+    };
+  }
+  if (step.cancelled) return { text: step.subtitle, className: "text-red-500 font-semibold" };
+  if (step.done) return { text: "Done", className: "text-[#22c55e]" };
+
+  const firstPending = steps.findIndex((s) => !s.done && !s.cancelled);
+  if (index === firstPending) {
+    return { text: "In Process...", className: "text-[#fe480b] italic font-medium" };
+  }
+  return { text: "Est. 15 Minutes", className: "text-[#9ca8a2] italic" };
 }
 
-// ---- Timeline step ----
-function TimelineStep({ icon, title, subtitle, isFirst, isLast, isDone, timestamp }) {
+function TimelineStep({ icon, title, subtitle, subtitleClassName = "text-[#9ca8a2]", isFirst, isLast, isDone, timestamp }) {
   return (
     <div className="flex items-start gap-3">
       <div className="flex flex-col items-center" style={{ minWidth: 32 }}>
@@ -63,139 +96,185 @@ function TimelineStep({ icon, title, subtitle, isFirst, isLast, isDone, timestam
       </div>
       <div className="flex-1 pb-3">
         <div className="flex items-baseline justify-between">
-          <span className={`text-sm font-semibold ${isDone ? "text-[#03130a]" : "text-[#6b7971]"}`}>
-            {title}
-          </span>
+          <span className="text-sm font-semibold text-[#03130a]">{title}</span>
           {isFirst && timestamp && (
             <span className="text-xs text-[#6b7971] font-medium">{timestamp}</span>
           )}
         </div>
-        <p className="text-xs text-[#9ca8a2] mt-0.5">{subtitle}</p>
+        <p className={`text-xs mt-0.5 ${subtitleClassName}`}>{subtitle}</p>
       </div>
     </div>
   );
 }
 
-// ---- Step builders ----
-function buildInstantSteps(orderTime) {
-  const timestamp =
-    orderTime ||
-    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-  return [
-    { id: "accepted", title: "Order Accepted", subtitle: "Done", icon: <CheckIcon />, done: true, timestamp },
-    { id: "prepared", title: "Order Prepared", subtitle: "In Process...", icon: <PrepIcon />, done: false },
-    { id: "ready", title: "Order Ready", subtitle: "Est. 15 Minutes", icon: <ReadyIcon />, done: false },
-    { id: "delivered", title: "Order Delivered", subtitle: "Est. 25 Minutes", icon: <DeliverIcon />, done: false },
-  ];
-}
-
-// ---- Main reusable component ----
+/**
+ * Rendered inside BottomDock. Collapsed it is a plain card so it can stack above the
+ * cart bar; expanded it becomes a full-screen sheet (it opts out of the stack).
+ */
 export default function OrderStatusPanel() {
   const router = useRouter();
-  const { activeOrder, itemCount } = useCart();
+  const { activeOrder, orders } = useOrders();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Only show when there is an active order
   if (!activeOrder) return null;
 
-  const steps = buildInstantSteps(activeOrder.time);
-  const primaryMessage = "We've successfully received your order.";
-  const hasCartItems = itemCount > 0;
+  const activeOrders = orders.filter((order) => order && !order.isTerminal);
+  const hasManyActive = activeOrders.length > 1;
 
-  return (
-    <>
-      {isExpanded && (
+  const primaryMessage = STATUS_MESSAGES[activeOrder.status] || "Your order is in progress.";
+
+  const steps = (activeOrder.steps || []).map((step) => ({
+    ...step,
+    icon: STEP_ICONS[step.id] || STEP_ICONS.accepted,
+  }));
+
+  if (isExpanded) {
+    // The dock is itself `position: fixed`, so a fixed child would resolve against
+    // the dock's box instead of the viewport. Portal to <body> to escape it.
+    if (typeof document === "undefined") return null;
+
+    const highlight = STATUS_HIGHLIGHT[activeOrder.status];
+    const highlightClass = activeOrder.status === "CANCELLED" ? "text-[#ef4444]" : "text-[#22c55e]";
+
+    return createPortal(
+      <>
         <div
           className="fixed inset-0 z-[9998] bg-black/40 backdrop-blur-[1.5px]"
+          onClick={() => setIsExpanded(false)}
           aria-hidden="true"
         />
-      )}
 
-      <div
-        className={`fixed left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-300 ${
-          isExpanded
-            ? "w-full px-0 pb-0 pt-0 z-[9999] bottom-0"
-            : `w-full max-w-[480px] sm:max-w-[768px] px-4 pt-0 z-40 ${
-                hasCartItems ? "pb-4" : "pb-4"
-              }`
-        }`}
-        style={isExpanded ? undefined : { bottom: hasCartItems ? `${CART_BAR_HEIGHT}px` : "0px" }}
-      >
-        {isExpanded && (
+        <div className="fixed inset-x-0  bottom-0  z-[9999] mx-auto w-full max-w-[480px] sm:max-w-[768px] bg-white rounded-t-2xl flex flex-col max-h-[85vh] shadow-[0_-8px_30px_rgba(0,0,0,0.18)]">
+          {/* Close button straddling the top edge of the sheet */}
           <button
             type="button"
             onClick={() => setIsExpanded(false)}
-            className="absolute -top-12 left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-white border border-[#e0e3e1] shadow-md flex items-center justify-center cursor-pointer hover:bg-[#f7f8fa] transition-colors z-10 pointer-events-auto"
+            className="absolute -top-12 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-white border border-[#e0e3e1] flex items-center justify-center cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.18)] hover:bg-[#f7f8fa] transition-colors"
             aria-label="Close order status panel"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M18 6L6 18M6 6L18 18" stroke="#03130a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M18 6L6 18M6 6L18 18" stroke="#03130a" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </button>
-        )}
 
-        <div
-          className={`bg-white border border-[#e0e3e1] shadow-[0_-4px_24px_rgba(0,0,0,0.12)] pointer-events-auto overflow-hidden transition-all duration-300 ${
-            isExpanded ? "rounded-none" : "rounded-xl"
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => setIsExpanded((p) => !p)}
-            className="w-full flex items-center justify-between px-4 py-3.5 cursor-pointer"
-            aria-expanded={isExpanded}
-          >
-            <div className="flex flex-col items-start">
-              <div className="flex items-center gap-2">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke="#6b7971" strokeWidth="1.5" strokeLinecap="round" />
-                  <rect x="9" y="3" width="6" height="4" rx="1" stroke="#6b7971" strokeWidth="1.5" />
-                </svg>
-                <span className="text-sm font-bold text-[#03130a]">Order Status</span>
-              </div>
-              <p className="text-xs text-[#6b7971] mt-0.5 pl-[26px]">{primaryMessage}</p>
-            </div>
-
-            {!isExpanded && (
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="transition-transform duration-300 shrink-0 rotate-180"
-              >
-                <path d="M6 9L12 15L18 9" stroke="#6b7971" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          {/* Header */}
+          <div className="shrink-0 px-5 pt-6 pb-4">
+            <div className="flex items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"
+                  stroke="#03130a"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+                <rect x="9" y="3" width="6" height="4" rx="1" stroke="#03130a" strokeWidth="1.5" />
               </svg>
-            )}
-          </button>
-
-          {isExpanded && (
-            <div className="px-4 pb-4 pt-1 border-t border-[#f0f0f0]">
-              <div className="flex flex-col gap-0">
-                {steps.map((step, idx) => (
-                  <TimelineStep
-                    key={step.id}
-                    icon={step.icon}
-                    title={step.title}
-                    subtitle={step.subtitle}
-                    isFirst={idx === 0}
-                    isLast={idx === steps.length - 1}
-                    isDone={step.done}
-                    timestamp={step.timestamp}
-                  />
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => router.push("/order-status")}
-                className="w-full mt-4 py-2 text-xs font-bold uppercase tracking-widest text-[#03130a] cursor-pointer hover:opacity-70 transition-opacity"
-              >
-                VIEW DETAILS
-              </button>
+              <span className="text-[17px] font-bold text-[#03130a]">Order Status</span>
             </div>
-          )}
+            <p className="text-[13px] text-[#6b7971] mt-1.5">
+              {highlight ? (
+                <>
+                  {highlight[0]}
+                  <em className={`${highlightClass} italic font-medium`}>{highlight[1]}</em>
+                  {highlight[2]}
+                </>
+              ) : (
+                primaryMessage
+              )}
+            </p>
+            <div className="h-px bg-[#eff1f0] mt-4" />
+          </div>
+
+          {/* Timeline */}
+          <div className="flex-1 overflow-y-auto px-5 pb-4">
+            {steps.map((step, index) => {
+              const copy = panelSubtitle(step, index, steps, activeOrder.status);
+              return (
+                <TimelineStep
+                  key={step.id}
+                  icon={step.icon}
+                  title={step.title}
+                  subtitle={copy.text}
+                  subtitleClassName={copy.className}
+                  isFirst={index === 0}
+                  isLast={index === steps.length - 1}
+                  isDone={step.done}
+                  timestamp={step.timestamp}
+                />
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="shrink-0 border-t border-[#eff1f0]">
+            <button
+              type="button"
+              onClick={() => {
+                setIsExpanded(false);
+                router.push("/order-status");
+              }}
+              className={`w-full py-4 text-xs font-bold uppercase tracking-widest text-[#03130a] cursor-pointer hover:bg-[#f7f8fa] transition-colors ${
+                hasManyActive ? "" : "rounded-b-2xl"
+              }`}
+            >
+              VIEW DETAILS
+            </button>
+            {hasManyActive && (
+              <>
+                <div className="h-px bg-[#eff1f0]" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExpanded(false);
+                    router.push("/active-orders");
+                  }}
+                  className="w-full py-4 text-xs font-bold uppercase tracking-widest text-[#03130a] cursor-pointer hover:bg-[#f7f8fa] transition-colors rounded-b-2xl"
+                >
+                  ALL ACTIVE ORDERS
+                </button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </>
+      </>,
+      document.body,
+    );
+  }
+
+  return (
+    <div className="w-full bg-white border border-[#e0e3e1] rounded-xl shadow-[0px_8px_30px_rgba(0,0,0,0.12)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(true)}
+        className="w-full flex items-center justify-between px-4 py-3.5 cursor-pointer"
+        aria-expanded={false}
+      >
+        <div className="flex flex-col items-start min-w-0">
+          <div className="flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"
+                stroke="#6b7971"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <rect x="9" y="3" width="6" height="4" rx="1" stroke="#6b7971" strokeWidth="1.5" />
+            </svg>
+            <span className="text-sm font-bold text-[#03130a]">{activeOrder.statusLabel}</span>
+          </div>
+          <p className="text-xs text-[#6b7971] mt-0.5 pl-[26px] truncate">{primaryMessage}</p>
+        </div>
+
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          className="transition-transform duration-300 shrink-0 rotate-180"
+        >
+          <path d="M6 9L12 15L18 9" stroke="#6b7971" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </div>
   );
 }

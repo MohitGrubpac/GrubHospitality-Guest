@@ -76,6 +76,7 @@ export default function LoginHeader() {
             src={slide.image}
             alt={slide.title}
             fill
+            sizes="(max-width: 768px) 100vw, 768px"
             className="object-cover object-center brightness-[0.75]"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />

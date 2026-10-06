@@ -1,60 +1,48 @@
 "use client";
 
-import { useEffect } from "react";
 import Image from "next/image";
-import {
-  MdClose,
-  MdStar,
-  MdOutlineDeliveryDining,
-  MdOutlineSchedule,
-} from "react-icons/md";
+import { MdClose } from "react-icons/md";
 import CartCounterButton from "@/component/ui/CartCounterButton";
+import TagChips from "@/component/ui/TagChips";
+import VegIndicator from "@/component/ui/VegIndicator";
 
-export default function MenuDetailModal({
-  item,
-  restaurant = null,
-  onClose,
-  onAdd,
-}) {
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
+export default function MenuDetailModal({ item, onClose }) {
   if (!item) return null;
+
+  const { menuItemId, name, description, price, isVeg, image, isOutOfStock, rating } = item;
+  const tagChips =
+    item.tagList ??
+    (Array.isArray(item.tags)
+      ? item.tags.map((tag) => (typeof tag === "string" ? { name: tag, icon: "" } : tag))
+      : []);
+  const hasRating = Number(rating) > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
       {/* Backdrop */}
-      <div
-        className="absolute backdrop-blur-[3px] inset-0 bg-black/60"
-        onClick={onClose}
-      />
+      <div className="absolute backdrop-blur-[3px] inset-0 bg-black/60" onClick={onClose} />
 
       {/* Bottom Sheet Content */}
-      <div className="relative p-2 bg-white w-full  rounded-t-[10px] z-10">
-        {/* Close button - centered above card */}
+      <div className="relative p-2 bg-white w-full rounded-t-[10px] z-10">
         <button
+          type="button"
           onClick={onClose}
           className="absolute -top-[48px] left-1/2 -translate-x-1/2 w-[40px] h-[40px] flex items-center justify-center bg-white rounded-full cursor-pointer z-10 shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+          aria-label="Close"
         >
           <MdClose className="w-6 h-6 text-[var(--gp-color-text-neutral-primary)]" />
         </button>
 
-        {/* Content Card - slides up from bottom */}
         <div className="w-full bg-white rounded-t-[24px] animate-slide-up">
           {/* Food Image */}
           <div className="w-full h-[200px] relative">
-            {item.image ? (
+            {image ? (
               <Image
-                src={item.image}
-                alt={item.name}
+                src={image}
+                alt={name}
                 fill
                 sizes="100vw"
-                className="object-cover rounded-t-[12px] p-2 "
+                className="object-cover rounded-t-[12px] p-2"
               />
             ) : (
               <div className="w-full h-full bg-[var(--gp-color-bg-neutral-secondary)] rounded-t-[24px]" />
@@ -63,43 +51,51 @@ export default function MenuDetailModal({
 
           {/* Item Details */}
           <div className="flex flex-col gap-[16px] p-[16px]">
-            {/* Name */}
             <h2 className="text-[24px] font-semibold text-[var(--gp-color-text-neutral-primary)] leading-[32px]">
-              {item.name}
+              {name}
             </h2>
 
-            {/* Price, Rating, Icons, ADD */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-[12px]">
+            {isOutOfStock && (
+              <span className="self-start text-[12px] font-semibold uppercase tracking-wide text-[#b42318] bg-[#fee4e2] rounded px-[8px] py-[4px]">
+                Out of stock
+              </span>
+            )}
+
+            {/* Price, rating, veg and tags share the row with the ADD button */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 flex-wrap min-w-0">
                 <span className="text-[18px] font-semibold text-[var(--gp-color-text-neutral-primary)]">
-                  ₹{item.price}
+                  ₹{price}
                 </span>
-                {item.rating > 0 && (
-                  <div className="flex items-center gap-[4px]">
-                    <MdStar className="w-[16px] h-[16px] text-[var(--gp-color-warning)]" />
-                    <span className="text-[14px] font-medium text-[var(--gp-color-text-neutral-primary)]">
-                      {item.rating}
+                {hasRating && (
+                  <span className="flex items-center gap-[4px] shrink-0">
+                    <Image
+                      src="/restaurant/star.svg"
+                      alt="Rating"
+                      width={18}
+                      height={18}
+                      className="w-[18px] h-[18px] object-contain"
+                    />
+                    <span className="text-[15px] font-medium text-[var(--gp-color-text-neutral-primary)]">
+                      {rating}
                     </span>
-                  </div>
+                  </span>
                 )}
-                <MdOutlineDeliveryDining className="w-[16px] h-[16px] text-[var(--gp-color-text-neutral-tertiary)]" />
-                <MdOutlineSchedule className="w-[16px] h-[16px] text-[var(--gp-color-text-neutral-tertiary)]" />
+                <VegIndicator isVeg={isVeg} />
+                <TagChips tags={tagChips} />
               </div>
-              {restaurant && item ? (
-                <CartCounterButton
-                  restaurant={restaurant}
-                  item={item}
-                  addClassName="h-[40px] px-[20px]"
-                />
-              ) : null}
+              <CartCounterButton
+                menuItemId={menuItemId}
+                disabled={isOutOfStock}
+                addClassName="h-[40px] px-[20px]"
+              />
             </div>
 
-            {/* Description */}
-            <p className="text-[14px] leading-[22px] text-[var(--gp-color-text-neutral-secondary)]">
-              Savor our exquisite {item.name}, featuring aromatic basmati rice,
-              succulent marinated meat, and a delicate blend of traditional
-              spices, all slow-cooked to perfection in a 5-star style.
-            </p>
+            {description && (
+              <p className="text-[14px] leading-[22px] text-[var(--gp-color-text-neutral-secondary)]">
+                {description}
+              </p>
+            )}
           </div>
         </div>
       </div>

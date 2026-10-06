@@ -6,6 +6,7 @@ import RestaurantCard from "./RestaurantCard";
 export default function RestaurantListSection({
   restaurants,
   searchQuery,
+  isLoading = false,
   limit,
 }) {
   const router = useRouter();
@@ -29,13 +30,15 @@ export default function RestaurantListSection({
 
       {/* Restaurant Cards */}
       <div className="flex flex-col gap-4">
-        {displayedRestaurants.length > 0 ? (
+        {isLoading && displayedRestaurants.length === 0 ? (
+          <div className="text-center py-8 text-sm text-[#6b7971]">Loading kitchens...</div>
+        ) : displayedRestaurants.length > 0 ? (
           displayedRestaurants.map((restaurant) => (
             <RestaurantCard key={restaurant.id} restaurant={restaurant} />
           ))
         ) : (
           <div className="text-center py-8 text-sm text-[#6b7971]">
-            No restaurants found matching "{searchQuery}"
+            No kitchens found matching &quot;{searchQuery}&quot;
           </div>
         )}
       </div>

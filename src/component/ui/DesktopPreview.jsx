@@ -1,19 +1,23 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+function subscribeViewport(callback) {
+  window.addEventListener("resize", callback);
+  return () => window.removeEventListener("resize", callback);
+}
 
 export default function DesktopPreview() {
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [url, setUrl] = useState("");
+  const isDesktop = useSyncExternalStore(
+    subscribeViewport,
+    () => window.innerWidth > 1024,
+    () => false,
+  );
 
-  useEffect(() => {
-    const check = () => setIsDesktop(window.innerWidth > 1024);
-    check();
-    window.addEventListener("resize", check);
-
-    setUrl(window.location.href);
-
-    return () => window.removeEventListener("resize", check);
-  }, []);
+  const url = useSyncExternalStore(
+    () => () => {},
+    () => window.location.href,
+    () => "",
+  );
 
   if (!isDesktop) return null;
 

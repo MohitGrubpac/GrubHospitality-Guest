@@ -1,0 +1,14 @@
+﻿import { chromium } from "playwright-core";
+const CHROME = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe";
+const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+const page = await browser.newPage({ viewport: { width: 412, height: 915 } });
+const errors = [];
+page.on("console", (m) => { if (m.type() === "error") errors.push("CONSOLE: " + m.text()); });
+page.on("pageerror", (e) => errors.push("PAGEERROR: " + e.message));
+await page.goto("http://localhost:3222/login", { waitUntil: "networkidle", timeout: 30000 }).catch((e) => errors.push("NAV: " + e.message));
+await page.waitForTimeout(2000);
+console.log("URL:", page.url());
+console.log("BODY:", (await page.locator("body").innerText()).slice(0, 1200));
+console.log("INPUTS:", await page.locator("input").count());
+console.log("ERRORS:\n" + errors.join("\n"));
+await browser.close();

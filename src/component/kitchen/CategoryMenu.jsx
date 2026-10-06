@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
 export default function CategoryMenu({
@@ -37,7 +38,7 @@ export default function CategoryMenu({
           background: isOpen ? "var(--gp-color-bg-brand-secondary)" : "#FFFFFF",
         }}
       >
-        <img
+        <Image
           src="/kitchen/list.png"
           alt="Menu list"
           width={20}
@@ -57,9 +58,9 @@ export default function CategoryMenu({
         </span>
       </button>
 
-      {/* Categories Popup */}
+      {/* Categories Popup - opens upward from the floating bottom-right button */}
       {isOpen && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-[280px] bg-white rounded-[var(--gp-radius-base)] border border-[var(--gp-color-border-neutral)] shadow-[0_4px_16px_rgba(0,0,0,0.12)] z-20 overflow-hidden">
+        <div className="absolute right-0 bottom-[calc(100%+8px)] w-[280px] bg-white rounded-[var(--gp-radius-base)] border border-[var(--gp-color-border-neutral)] shadow-[0_4px_16px_rgba(0,0,0,0.12)] z-20 overflow-hidden">
           {categories.length === 0 ? (
             <p className="px-[var(--gp-padding-l)] py-[var(--gp-padding-l)] text-[14px] text-[var(--gp-color-text-neutral-tertiary)]">
               No categories available

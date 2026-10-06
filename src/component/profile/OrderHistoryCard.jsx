@@ -21,10 +21,10 @@ export default function OrderHistoryCard() {
           </p>
         </div>
 
-        <div className="w-7 h-7  flex items-center justify-center shrink-0">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0">
           <Image
-            src="/profile/chevron_down.svg"
-            alt="Order History"
+            src="/profile/external_link.svg"
+            alt="View"
             width={16}
             height={16}
             className="w-4 h-4 object-contain"

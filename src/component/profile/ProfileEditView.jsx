@@ -1,135 +1,126 @@
 "use client";
 
-import { useState, useRef } from "react";
-import Image from "next/image";
+import { useState } from "react";
+import { ApiError } from "@/lib/api-client";
+import { showError, showSuccess } from "@/component/ui/Toast";
 
-export default function ProfileEditView({ user, avatarUrl, onSaveAvatar, onCancel }) {
-  const [previewUrl, setPreviewUrl] = useState(avatarUrl || null);
-  const fileInputRef = useRef(null);
+/**
+ * PATCH /guests/me validates strictly and accepts `name` only - sending `roomNumber`
+ * is rejected with 400. Rooms come from the reservation (GET /guests/me `stay`) and are
+ * changed from the room switcher, not the profile editor.
+ */
+export default function ProfileEditView({ user, onSave, onCancel }) {
+  const [name, setName] = useState(user?.name || "");
+  const [isSaving, setIsSaving] = useState(false);
 
-  const name = user?.name || user?.guestName || "John Doe";
-  const mobile = user?.mobile || "+91 95604 34587";
-  const email = user?.email || "johndoe@gmail.com";
-  const initials = user?.avatarInitials || "RK";
+  const numbersLabel = (user?.roomNumbers?.length || 0) > 1 ? "s" : "";
 
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    const patch = {};
+    if (name.trim() && name.trim() !== user?.name) patch.name = name.trim();
+
+    if (Object.keys(patch).length === 0) {
+      onCancel();
+      return;
     }
-  };
 
-  const handleUpdate = (e) => {
-    e.preventDefault();
-    if (onSaveAvatar) {
-      onSaveAvatar(previewUrl);
+    setIsSaving(true);
+    try {
+      await onSave(patch);
+      showSuccess("Profile updated", "Your details have been saved.");
+      onCancel();
+    } catch (saveError) {
+      showError(
+        saveError instanceof ApiError
+          ? saveError.message
+          : "Could not save your profile. Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col justify-between pt-2 pb-6 px-1">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleImageChange}
-        accept="image/*"
-        className="hidden"
-      />
-
-      <div className="flex flex-col gap-6 w-full items-center">
-        <div className="flex flex-col items-center gap-2 pt-2">
-          <div className="w-[107px] h-[107px] rounded-full bg-[#FF4848] border border-white flex items-center justify-center text-white text-[28px] font-semibold leading-[36px] relative overflow-hidden shadow-xs">
-            {previewUrl ? (
-              <Image
-                src={previewUrl}
-                alt={name}
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <span className="text-white font-semibold text-[28px] leading-[36px]">
-                {initials}
-              </span>
-            )}
+    <form onSubmit={handleSubmit} className="w-full flex-1 flex flex-col justify-between pt-2 pb-6 px-1">
+      <div className="flex flex-col gap-4 w-full">
+        <div className="w-full flex flex-col items-center">
+          <div className="w-[107px] h-[107px] rounded-full bg-[#FF4848] border border-white flex items-center justify-center text-white text-[28px] font-semibold leading-[36px] shadow-xs">
+            <span>{user?.avatarInitials || "G"}</span>
           </div>
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center gap-1 h-[20px] text-xs font-medium text-[#FF3333] uppercase cursor-pointer pt-1"
-          >
-            <Image
-              src="/profile/upload.svg"
-              alt="Upload"
-              width={16}
-              height={16}
-              className="w-4 h-4 object-contain"
-            />
-            <span className="text-[14px] leading-[16px] font-medium tracking-normal text-[#FF3333]">
-              UPLOAD IMAGE
-            </span>
-          </button>
         </div>
 
         <div className="w-full bg-white rounded-2xl p-5 shadow-xs border border-[#E0E3E1] flex flex-col gap-4">
           <div className="flex flex-col gap-2 w-full">
-            <label className="text-[16px] leading-[24px] font-normal text-[#37493F]">
+            <label htmlFor="edit-name" className="text-[16px] leading-[24px] text-[#37493F]">
               Name
             </label>
-            <div className="w-full h-[44px] px-4 py-3 bg-white border border-[#E0E3E1] rounded-lg flex items-center">
+            <div className="w-full h-[44px] px-4 py-3 bg-white border border-[#E0E3E1] rounded-lg flex items-center focus-within:border-[#FF3333] transition-colors">
               <input
+                id="edit-name"
                 type="text"
-                readOnly
-                disabled
                 value={name}
-                className="w-full bg-transparent text-[14px] leading-[20px] font-normal text-[#6B7971] outline-none cursor-not-allowed"
+                onChange={(event) => setName(event.target.value)}
+                maxLength={80}
+                className="w-full bg-transparent text-[14px] leading-[20px] text-[#03130A] outline-none"
               />
             </div>
           </div>
 
           <div className="flex flex-col gap-2 w-full">
-            <label className="text-[16px] leading-[24px] font-normal text-[#37493F]">
-              Mobile
-            </label>
-            <div className="w-full h-[44px] px-4 py-3 bg-white border border-[#E0E3E1] rounded-lg flex items-center">
-              <input
-                type="text"
-                readOnly
-                disabled
-                value={mobile}
-                className="w-full bg-transparent text-[14px] leading-[20px] font-normal text-[#6B7971] outline-none cursor-not-allowed"
-              />
+            <span className="text-[16px] leading-[24px] text-[#37493F]">
+              Room{numbersLabel}
+            </span>
+            <div className="w-full h-[44px] px-4 py-3 bg-[#f7f8fa] border border-[#E0E3E1] rounded-lg flex items-center">
+              <span className="text-[14px] leading-[20px] text-[#6B7971]">
+                {user?.roomNumbers?.length
+                  ? user.roomNumbers.map((room) => `Room ${room}`).join(", ")
+                  : "Not provided"}
+              </span>
+            </div>
+            <p className="text-[11px] leading-[16px] text-[#6B7971]">
+              Rooms are managed by your reservation. Use the room switcher on the cart to
+              choose where your order is delivered.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 w-full">
+            <span className="text-[16px] leading-[24px] text-[#37493F]">Mobile</span>
+            <div className="w-full h-[44px] px-4 py-3 bg-[#f7f8fa] border border-[#E0E3E1] rounded-lg flex items-center">
+              <span className="text-[14px] leading-[20px] text-[#6B7971]">
+                {user?.mobile || "Not provided"}
+              </span>
             </div>
           </div>
 
           <div className="flex flex-col gap-2 w-full">
-            <label className="text-[16px] leading-[24px] font-normal text-[#37493F]">
-              Email
-            </label>
-            <div className="w-full h-[44px] px-4 py-3 bg-white border border-[#E0E3E1] rounded-lg flex items-center">
-              <input
-                type="email"
-                readOnly
-                disabled
-                value={email}
-                className="w-full bg-transparent text-[14px] leading-[20px] font-normal text-[#6B7971] outline-none cursor-not-allowed"
-              />
+            <span className="text-[16px] leading-[24px] text-[#37493F]">Email</span>
+            <div className="w-full h-[44px] px-4 py-3 bg-[#f7f8fa] border border-[#E0E3E1] rounded-lg flex items-center">
+              <span className="text-[14px] leading-[20px] text-[#6B7971]">
+                {user?.email || "Not provided"}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Update Profile  */}
-      <div className="w-full pt-6">
+      <div className="w-full pt-6 flex flex-col gap-3">
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="w-full h-[48px] bg-[#FF4848] border border-[#FF3333] text-white rounded-lg text-[18px] leading-[24px] font-medium uppercase cursor-pointer shadow-xs disabled:opacity-60"
+        >
+          {isSaving ? "saving..." : "update profile"}
+        </button>
         <button
           type="button"
-          onClick={handleUpdate}
-          className="w-full h-[48px] bg-[#FF4848] border border-[#FF3333] text-white rounded-lg text-[18px] leading-[24px] font-medium uppercase tracking-normal cursor-pointer shadow-xs"
+          onClick={onCancel}
+          className="w-full py-3 text-sm font-semibold text-[#6b7971] uppercase cursor-pointer hover:text-[#03130a] transition-colors"
         >
-          update profile
+          cancel
         </button>
       </div>
-    </div>
+    </form>
   );
 }

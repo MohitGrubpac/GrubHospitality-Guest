@@ -1,44 +1,70 @@
 "use client";
 
-import { createContext, useContext, useState, useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import {
+  clearSelectedRoom as clearSelectedRoomAction,
+  readStoredRoom,
+  setSelectedRoom as setSelectedRoomAction,
+} from "@/store/roomSlice";
 
-const RoomContext = createContext(null);
+/**
+ * Rooms are owned by the PMS and arrive on the profile as `stay.roomNumbers[]`.
+ * Which one an order is delivered to is a device-local choice kept in localStorage
+ * (PATCH /guests/me rejects `roomNumber`); the selection lives in `store/roomSlice`.
+ */
+const EMPTY_ROOMS = [];
 
-const ROOM_MAP = {
-  "9876543210": ["206", "207", "208", "302"],
-  "1234567890": ["302"],
-};
+export function useRoom() {
+  const dispatch = useAppDispatch();
+  const guestId = useAppSelector((state) => state.auth.guest?.id);
+  const roomNumbers = useAppSelector((state) => state.auth.guest?.roomNumbers);
+  const preferredRoom = useAppSelector((state) => state.room.preferredRoom);
 
-export function RoomProvider({ children }) {
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [phone, setPhone] = useState(null);
+  const bookedRooms = useMemo(() => roomNumbers || EMPTY_ROOMS, [roomNumbers]);
 
-  const bookedRooms = useMemo(() => {
-    if (!phone) return [];
-    return ROOM_MAP[phone] || [];
-  }, [phone]);
+  // Validate the stored choice against the rooms the guest actually holds - the
+  // reservation can change between visits.
+  const selectedRoom = useMemo(() => {
+    if (bookedRooms.length === 0) return "";
+    if (preferredRoom && bookedRooms.includes(preferredRoom)) return preferredRoom;
+
+    const stored = readStoredRoom(guestId);
+    if (stored && bookedRooms.includes(stored)) return stored;
+
+    return bookedRooms[0];
+  }, [bookedRooms, preferredRoom, guestId]);
+
+  const setSelectedRoom = useCallback(
+    (room) => dispatch(setSelectedRoomAction(room)),
+    [dispatch],
+  );
+  const clearSelectedRoom = useCallback(
+    () => dispatch(clearSelectedRoomAction()),
+    [dispatch],
+  );
 
   const isMultipleRooms = bookedRooms.length > 1;
+  const hasStoredChoice = Boolean(readStoredRoom(guestId));
 
-  const value = useMemo(
+  return useMemo(
     () => ({
       selectedRoom,
       setSelectedRoom,
+      clearSelectedRoom,
       bookedRooms,
       isMultipleRooms,
-      phone,
-      setPhone,
+      hasSelectedRoom: Boolean(selectedRoom),
+      // True when the guest has a choice to make and has not made it yet.
+      needsRoomSelection: isMultipleRooms && !hasStoredChoice,
     }),
-    [selectedRoom, bookedRooms, isMultipleRooms, phone],
+    [
+      selectedRoom,
+      setSelectedRoom,
+      clearSelectedRoom,
+      bookedRooms,
+      isMultipleRooms,
+      hasStoredChoice,
+    ],
   );
-
-  return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;
-}
-
-export function useRoom() {
-  const context = useContext(RoomContext);
-  if (!context) {
-    throw new Error("useRoom must be used within a RoomProvider");
-  }
-  return context;
 }

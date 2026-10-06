@@ -1,200 +1,108 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
-import data from "@/data/data.json";
+import { useCallback, useMemo } from "react";
+import {
+  addToCart as addToCartAction,
+  changeQuantity,
+  checkout as checkoutAction,
+  clearCart as clearCartAction,
+  refreshCart,
+  removeItem as removeItemAction,
+  reorderItems as reorderItemsAction,
+  setNote as setNoteAction,
+  setQuantity as setQuantityAction,
+} from "@/store/cartSlice";
+import { selectIsAuthenticated } from "@/store/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { EMPTY_CART, resolveSpecialInstructions, toCartView } from "@/lib/adapters/cartAdapter";
 
-const CartContext = createContext(null);
-
-export function CartProvider({ children }) {
-  // items: [{ restaurant, item, qty }] where restaurant = { id, name, slug }
-  const [items, setItems] = useState([]);
-  // Per-kitchen notes: { [restaurantId]: string }
-  const [kitchenNotes, setKitchenNotesState] = useState({});
-  // Global order instruction
-  const [orderInstruction, setOrderInstructionState] = useState("");
-  // Order placed flag
-  const [lastOrderId, setLastOrderId] = useState(null);
-  // Active order details
-  const [activeOrder, setActiveOrder] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("grubpac_active_order");
-      return saved ? JSON.parse(saved) : null;
-    }
-    return null;
-  });
-
-  const addToCart = (restaurant, item) => {
-    if (!restaurant || !item) return;
-    setItems((prev) => {
-      const existing = prev.find(
-        (entry) => entry.restaurant.id === restaurant.id && entry.item.id === item.id,
-      );
-      if (existing) {
-        return prev.map((entry) =>
-          entry.restaurant.id === restaurant.id && entry.item.id === item.id
-            ? { ...entry, qty: entry.qty + 1 }
-            : entry,
-        );
-      }
-      return [...prev, { restaurant, item, qty: 1 }];
-    });
-  };
-
-  const removeFromCart = (restaurantId, itemId) => {
-    setItems((prev) =>
-      prev.filter(
-        (entry) => !(entry.restaurant.id === restaurantId && entry.item.id === itemId),
-      ),
-    );
-  };
-
-  const updateQty = (restaurantId, itemId, delta) => {
-    setItems((prev) =>
-      prev
-        .map((entry) =>
-          entry.restaurant.id === restaurantId && entry.item.id === itemId
-            ? { ...entry, qty: entry.qty + delta }
-            : entry,
-        )
-        .filter((entry) => entry.qty > 0),
-    );
-  };
-
-  const reorderItems = (order) => {
-    if (!order || !order.items) return;
-
-    const restaurant = data.restaurants.find(
-      (r) => r.name.toLowerCase() === order.restaurantName.toLowerCase(),
-    );
-    if (!restaurant) return;
-
-    const allMenuItems = restaurant.menu.flatMap((cat) => cat.items || []);
-
-    order.items.forEach((orderItem) => {
-      const menuItem = allMenuItems.find(
-        (mi) => mi.name.toLowerCase() === orderItem.name.toLowerCase(),
-      );
-      const itemToAdd = menuItem || {
-        id: `reorder-${order.id}-${orderItem.name}`,
-        name: orderItem.name,
-        price: orderItem.price || 0,
-        isVeg: orderItem.isVeg,
-      };
-
-      const qty = orderItem.qty || 1;
-      for (let i = 0; i < qty; i++) {
-        addToCart(
-          { id: restaurant.id, name: restaurant.name, slug: restaurant.slug },
-          itemToAdd,
-        );
-      }
-    });
-  };
-
-  const clearCart = () => {
-    setItems([]);
-    setKitchenNotesState({});
-    setOrderInstructionState("");
-  };
-
-  const setKitchenNote = (restaurantId, note) => {
-    setKitchenNotesState((prev) => ({ ...prev, [restaurantId]: note }));
-  };
-
-  const setOrderInstruction = (text) => {
-    setOrderInstructionState(text);
-  };
-  
-  const clearActiveOrder = () => {
-    setActiveOrder(null);
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("grubpac_active_order");
-    }
-  };
-
-  const updateActiveOrderStatus = (newStatus) => {
-    setActiveOrder((prev) => {
-      if (!prev) return null;
-      const updated = { ...prev, status: newStatus };
-      if (typeof window !== "undefined") {
-        localStorage.setItem("grubpac_active_order", JSON.stringify(updated));
-      }
-      return updated;
-    });
-  };
-
-  const cancelOrder = ({ reason, comments }) => {
-    setActiveOrder((prev) => {
-      if (!prev) return null;
-      const updated = { ...prev, status: "Cancelled", cancelReason: reason, cancelComments: comments };
-      if (typeof window !== "undefined") {
-        localStorage.setItem("grubpac_active_order", JSON.stringify(updated));
-      }
-      return updated;
-    });
-  };
-
-  const placeOrder = (scheduleInfo = null) => {
-    const randomId = `#${Math.floor(100000 + Math.random() * 900000)}`;
-    const orderItems = [...items];
-    const orderData = {
-      id: randomId,
-      items: orderItems,
-      subtotal: items.reduce((sum, entry) => sum + entry.qty * entry.item.price, 0),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-      status: "Accepted",
-      restaurantSlug: orderItems[0]?.restaurant?.slug || null,
-      isScheduled: !!scheduleInfo,
-      scheduleInfo: scheduleInfo || null,
-    };
-
-    setActiveOrder(orderData);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("grubpac_active_order", JSON.stringify(orderData));
-    }
-
-    setLastOrderId(randomId);
-    clearCart();
-    return orderData;
-  };
-
-  const value = useMemo(() => {
-    const itemCount = items.reduce((sum, entry) => sum + entry.qty, 0);
-    const subtotal = items.reduce(
-      (sum, entry) => sum + entry.qty * entry.item.price,
-      0,
-    );
-    const restaurantCount = new Set(items.map((entry) => entry.restaurant.id)).size;
-    return {
-      items,
-      itemCount,
-      subtotal,
-      restaurantCount,
-      kitchenNotes,
-      orderInstruction,
-      lastOrderId,
-      activeOrder,
-      addToCart,
-      reorderItems,
-      removeFromCart,
-      updateQty,
-      clearCart,
-      setKitchenNote,
-      setOrderInstruction,
-      placeOrder,
-      clearActiveOrder,
-      updateActiveOrderStatus,
-      cancelOrder,
-    };
-  }, [items, kitchenNotes, orderInstruction, lastOrderId, activeOrder]);
-
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
-}
-
+/**
+ * The cart lives on the server (GET/POST/PATCH/DELETE /guest/cart); the raw payload
+ * is kept in `store/cartSlice` and every mutation returns the full updated cart, so
+ * prices and totals shown in the UI are always the ones the server will charge.
+ */
 export function useCart() {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error("useCart must be used within a CartProvider");
-  }
-  return context;
+  const dispatch = useAppDispatch();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const rawCart = useAppSelector((state) => state.cart.rawCart);
+  const mutatingId = useAppSelector((state) => state.cart.mutatingId);
+  const error = useAppSelector((state) => state.cart.error);
+
+  const cart = isAuthenticated && rawCart ? toCartView(rawCart) : EMPTY_CART;
+  // The first server read has not landed yet.
+  const isLoading = isAuthenticated && rawCart === null;
+
+  const refresh = useCallback(() => dispatch(refreshCart()), [dispatch]);
+  const addToCart = useCallback((args) => dispatch(addToCartAction(args)), [dispatch]);
+  const setQuantity = useCallback((args) => dispatch(setQuantityAction(args)), [dispatch]);
+  const increment = useCallback(
+    (menuItemId, delta = 1) => dispatch(changeQuantity(menuItemId, delta)),
+    [dispatch],
+  );
+  const removeItem = useCallback(
+    (menuItemId) => dispatch(removeItemAction(menuItemId)),
+    [dispatch],
+  );
+  const setNote = useCallback(
+    (menuItemId, note) => dispatch(setNoteAction(menuItemId, note)),
+    [dispatch],
+  );
+  const clearCart = useCallback(() => dispatch(clearCartAction()), [dispatch]);
+  const checkout = useCallback((args) => dispatch(checkoutAction(args)), [dispatch]);
+  const reorderItems = useCallback((entries) => dispatch(reorderItemsAction(entries)), [dispatch]);
+
+  const getQuantity = useCallback(
+    (menuItemId) => cart.items.find((entry) => entry.item.id === menuItemId)?.qty || 0,
+    [cart.items],
+  );
+
+  const buildSpecialInstructions = useCallback(
+    (orderInstruction, kitchenNotes) =>
+      resolveSpecialInstructions({
+        orderInstruction,
+        kitchenNotes,
+        kitchens: cart.kitchens,
+      }),
+    [cart.kitchens],
+  );
+
+  return useMemo(
+    () => ({
+      ...cart,
+      isEmpty: cart.items.length === 0,
+      isLoading,
+      isCheckingOut: mutatingId === "__checkout__",
+      mutatingId,
+      isMutating: mutatingId !== null,
+      error,
+      refresh,
+      addToCart,
+      increment,
+      setQuantity,
+      removeItem,
+      setNote,
+      clearCart,
+      checkout,
+      reorderItems,
+      getQuantity,
+      buildSpecialInstructions,
+    }),
+    [
+      cart,
+      isLoading,
+      mutatingId,
+      error,
+      refresh,
+      addToCart,
+      increment,
+      setQuantity,
+      removeItem,
+      setNote,
+      clearCart,
+      checkout,
+      reorderItems,
+      getQuantity,
+      buildSpecialInstructions,
+    ],
+  );
 }

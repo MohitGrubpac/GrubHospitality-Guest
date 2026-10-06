@@ -4,7 +4,8 @@ import "@/styles/globals.css";
 import MainProvider from "@/component/providers/MainProvider";
 import DesktopPreview from "@/component/ui/DesktopPreview";
 import AppHeader from "@/component/ui/AppHeader";
-import AppCartBar from "@/component/ui/AppCartBar";
+import BottomDock from "@/component/ui/BottomDock";
+import AuthGate from "@/component/ui/AuthGate";
 
 const inter = Inter({
 	variable: "--font-primary",
@@ -42,9 +43,11 @@ export default function RootLayout({
 			>
 				<MainProvider>
 					<DesktopPreview />
-					<AppHeader />
-					{children}
-					<AppCartBar />
+					<AuthGate>
+						<AppHeader />
+						{children}
+						<BottomDock />
+					</AuthGate>
 				</MainProvider>
 			</body>
 		</html>

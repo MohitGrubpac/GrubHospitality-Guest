@@ -45,11 +45,16 @@ function generateDates(count = 7) {
   return dates;
 }
 
-function generateTimeSlots() {
+function generateTimeSlots(minDate = null) {
   // Generate time slots from 7:00 AM to 11:30 PM in 30-min intervals
   const slots = [];
   for (let h = 7; h <= 23; h++) {
     for (let m = 0; m < 60; m += 30) {
+      if (minDate) {
+        const slotDate = new Date(minDate);
+        slotDate.setHours(h, m, 0, 0);
+        if (slotDate < minDate) continue;
+      }
       const hour = h.toString().padStart(2, "0");
       const min = m.toString().padStart(2, "0");
       slots.push(`${hour}:${min}`);
@@ -60,10 +65,17 @@ function generateTimeSlots() {
 
 export default function ScheduleOrderModal({ isOpen, onClose, onSchedule }) {
   const dates = generateDates(7);
-  const timeSlots = generateTimeSlots();
 
   const [selectedDateIndex, setSelectedDateIndex] = useState(0);
   const [selectedTime, setSelectedTime] = useState(null);
+
+  // Today only offers slots still ahead (now + 30 min lead time); a selection
+  // from another day is simply not valid here, so derive instead of storing.
+  const now = new Date();
+  const isToday = dates[selectedDateIndex].dateObj.toDateString() === now.toDateString();
+  const minDate = isToday ? new Date(now.getTime() + 30 * 60 * 1000) : null;
+  const timeSlots = generateTimeSlots(minDate);
+  const effectiveTime = timeSlots.includes(selectedTime) ? selectedTime : null;
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -83,9 +95,9 @@ export default function ScheduleOrderModal({ isOpen, onClose, onSchedule }) {
   }, [isOpen]);
 
   const handleSchedule = () => {
-    if (!selectedTime) return;
+    if (!effectiveTime) return;
     const date = dates[selectedDateIndex];
-    onSchedule?.({ date, time: selectedTime });
+    onSchedule?.({ date, time: effectiveTime });
     onClose();
   };
 
@@ -108,7 +120,7 @@ export default function ScheduleOrderModal({ isOpen, onClose, onSchedule }) {
         aria-modal="true"
         aria-label="Schedule Order"
       >
-        {/* Close button — floats above the sheet's top edge */}
+        {/* Close button ÔÇö floats above the sheet's top edge */}
         <button
           type="button"
           onClick={onClose}
@@ -176,6 +188,11 @@ export default function ScheduleOrderModal({ isOpen, onClose, onSchedule }) {
 
         {/* Time Slots */}
         <div className="overflow-y-auto py-1" style={{ maxHeight: "180px" }}>
+          {timeSlots.length === 0 && (
+            <p className="py-6 text-center text-sm text-[#b0b8b4]">
+              No delivery slots left for this day. Please pick another date.
+            </p>
+          )}
           {timeSlots.map((slot) => {
             const isSelected = selectedTime === slot;
             return (
@@ -209,9 +226,9 @@ export default function ScheduleOrderModal({ isOpen, onClose, onSchedule }) {
           <button
             type="button"
             onClick={handleSchedule}
-            disabled={!selectedTime}
+            disabled={!effectiveTime}
             className={`flex-1 py-3.5 rounded-xl text-sm font-bold uppercase tracking-wide transition-colors cursor-pointer ${
-              selectedTime
+              effectiveTime
                 ? "bg-[#fe480b] text-white hover:bg-[#e4450a]"
                 : "bg-[#e0e3e1] text-[#b0b8b4] cursor-not-allowed"
             }`}

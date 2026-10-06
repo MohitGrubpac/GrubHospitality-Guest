@@ -1,33 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import data from "@/data/data.json";
-
-
 import HomeSearchBar from "@/component/Home/HomeSearchBar";
 import RestaurantCard from "@/component/Home/RestaurantCard";
-import OrderStatusPanel from "@/component/ui/OrderStatusPanel";
+import { useKitchens } from "@/hooks/useCatalog";
 
 export default function RestaurantListPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const { restaurants } = data;
+  const { kitchens, isLoading, error } = useKitchens();
 
-  // Filter
-  const filteredRestaurants = restaurants.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.cuisine.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const filteredKitchens = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return kitchens;
+
+    return kitchens.filter(
+      (kitchen) =>
+        kitchen.name.toLowerCase().includes(q) ||
+        (kitchen.hotelName || "").toLowerCase().includes(q) ||
+        (kitchen.code || "").toLowerCase().includes(q),
+    );
+  }, [kitchens, searchQuery]);
 
   return (
     <div className="w-full h-screen bg-[#f8faf9] flex flex-col items-center select-none overflow-hidden">
       <div className="w-full max-w-[480px] sm:max-w-[768px] bg-white h-screen shadow-sm flex flex-col overflow-hidden relative">
-
-
         <div className="shrink-0 px-5 pt-4 pb-3 flex flex-col gap-4 bg-white border-b border-[#eff1f0]">
           <div className="flex items-center gap-3">
             <button
@@ -44,31 +43,39 @@ export default function RestaurantListPage() {
                 className="w-5 h-5 object-contain"
               />
             </button>
-            <h1 className="text-lg font-semibold text-[#03130a]">Restaurants</h1>
+            <h1 className="text-lg font-semibold text-[#03130a]">Kitchens</h1>
           </div>
 
           <HomeSearchBar
-            placeholder="Search Restaurant"
+            placeholder="Search Kitchen"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(event) => setSearchQuery(event.target.value)}
           />
         </div>
 
         {/* Restaurant Listing - scrollable area */}
-        <div className="bg-[#f7f8fa] flex-1 px-5 py-4 flex flex-col gap-4 overflow-y-auto pb-16">
+        <div
+          className="bg-[#f7f8fa] flex-1 px-5 py-4 flex flex-col gap-4 overflow-y-auto"
+          style={{ paddingBottom: "calc(var(--bottom-dock-h, 0px) + 24px)" }}
+        >
           <div className="flex flex-col gap-4">
-            {filteredRestaurants.length > 0 ? (
-              filteredRestaurants.map((restaurant) => (
+            {error && !kitchens.length ? (
+              <div className="text-center py-12 text-sm text-[#b42318]">
+                Could not load kitchens. Please try again.
+              </div>
+            ) : isLoading && !kitchens.length ? (
+              <div className="text-center py-12 text-sm text-[#6b7971]">Loading kitchens...</div>
+            ) : filteredKitchens.length > 0 ? (
+              filteredKitchens.map((restaurant) => (
                 <RestaurantCard key={restaurant.id} restaurant={restaurant} />
               ))
             ) : (
               <div className="text-center py-12 text-sm text-[#6b7971]">
-                No restaurants found matching "{searchQuery}"
+                No kitchens found matching &quot;{searchQuery}&quot;
               </div>
             )}
           </div>
         </div>
-        <OrderStatusPanel />
       </div>
     </div>
   );

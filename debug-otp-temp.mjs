@@ -1,0 +1,28 @@
+﻿import { chromium } from "playwright-core";
+import { readFileSync } from "fs";
+import { API } from "./api-base-temp.mjs";
+const CHROME = "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe";
+const ME = JSON.parse(readFileSync("guest-me-fixture.json", "utf8"));
+const browser = await chromium.launch({ executablePath: CHROME, headless: true });
+const page = await browser.newPage({ viewport: { width: 412, height: 915 } });
+const errors = [];
+page.on("console", (m) => { if (m.type() === "error") errors.push("CONSOLE: " + m.text()); });
+page.on("pageerror", (e) => errors.push("PAGEERROR: " + e.message));
+await page.route(`${API}/**`, (route) => {
+  const p = new URL(route.request().url()).pathname.replace("/api/v1", "");
+  const ok = (b, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(b) });
+  console.log("REQ", route.request().method(), p);
+  if (p === "/guest-auth/otp/request") return ok({ message: "sent" });
+  if (p === "/guest-auth/login") return ok({ accessToken: "a1", refreshToken: "r1", guest: ME });
+  return route.fulfill({ status: 404, contentType: "application/json", body: "{}" });
+});
+await page.addInitScript(() => { localStorage.clear(); });
+await page.goto("http://localhost:3222/login", { waitUntil: "domcontentloaded" });
+await page.waitForSelector('input[placeholder="Mobile number or email"]', { timeout: 20000 });
+await page.fill('input[placeholder="Mobile number or email"]', "guest.demo@hyatt.grubpac.com");
+await page.locator("#get-otp-btn").click();
+await page.waitForTimeout(3000);
+console.log("URL:", page.url());
+console.log("BODY:", (await page.locator("body").innerText()).slice(0, 800));
+console.log("ERRORS:\n" + errors.join("\n"));
+await browser.close();
